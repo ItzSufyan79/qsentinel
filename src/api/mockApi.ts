@@ -1,35 +1,41 @@
+/**
+ * Mock backend for the QSentinel contract.
+ *
+ * Every number the UI shows originates here, so swapping in the real server
+ * means replacing this module and nothing else. The simulation physics
+ * (block structure, failure rates, forgery curve) is deterministic given the
+ * seed, so a run is reproducible from a shared link.
+ */
+
 import type {
-  Agreement,
-  AnalyticsPoint,
-  AttackId,
-  AttackResponse,
+  ActiveResponse,
+  ArbitrationResponse,
+  AttackOption,
+  AttackTypeId,
   BlockResult,
-  ChannelHealthResponse,
-  DashboardReport,
-  DistributeResponse,
-  FingerprintAxis,
-  FingerprintLegendEntry,
-  ForgeryCurve,
-  InitResponse,
+  ByAttackTypeRow,
+  DistributionResponse,
+  ForgeryComparison,
+  HistogramResponse,
   KeygenResponse,
   LogEntry,
+  LogPage,
+  PreviewResponse,
+  ResultResponse,
+  RunResponse,
   SignResponse,
+  StatsSummary,
   VerifierResult,
-  VerifyEvent,
 } from "./types";
+import { ApiError as ApiErrorClass, ATTACK_OPTIONS, attackLabel } from "./types";
+import type { QdsApi, RunContext } from "./contract";
 import { VERIFIER_NAMES, mulberry32 } from "../lib/rng";
 import { sleep as libSleep } from "../lib/async";
 
-/* ------------------------------------------------------------------ *
- * Mock backend. Every number the UI shows originates here, so swapping
- * in the real server means replacing this module and nothing else.
- * ------------------------------------------------------------------ */
 
-export interface RunContext {
-  signal?: AbortSignal;
-  /** 1 = normal demo speed, ~0.1 = fast-forward */
-  speed?: () => number;
-}
+/* ------------------------------------------------------------------ *
+ *  Protocol constants
+ * ------------------------------------------------------------------ */
 
 const BLOCKS = 63;
 const SLOTS_PER_BLOCK = 128;
@@ -42,301 +48,40 @@ function sleep(ms: number, ctx: RunContext = {}): Promise<void> {
   return libSleep(ms, { signal: ctx.signal, speed: ctx.speed });
 }
 
-/* ----------------------------- catalogue ----------------------------- */
+/* ------------------------------------------------------------------ *
+ *  Run state — the mock has to remember runs between calls
+ * ------------------------------------------------------------------ */
 
-const HARDWARE_PROFILE = {
-  label: "Standard Fiber Link — 10km",
-  stats: [
-    { label: "Expected noise", value: "2%" },
-    { label: "Photon loss", value: "low" },
-    { label: "Sample rate", value: "1 kHz" },
-  ],
-};
-
-
-const ATTACK_LABEL: Record<AttackId, string> = {
-  none: "None",
-  forgery: "Forgery",
-  impersonation: "Impersonation",
-  replay: "Replay",
-  "intercept-fixed": "Intercept-Resend (Fixed Basis)",
-  "intercept-random": "Intercept-Resend (Random Basis)",
-  tampering: "Signal Tampering",
-  partial: "Partial Attack",
-};
-
-const CLASSIFICATION: Record<
-  AttackId,
-  { honest: boolean; label: string; explanation: string }
-> = {
-  none: {
-    honest: true,
-    label: "No anomaly detected",
-    explanation:
-      "Error statistics stayed inside the expected honest range for every block.",
-  },
-  forgery: {
-    honest: false,
-    label: "Forgery attempt detected",
-    explanation:
-      "The pattern of errors matches an attacker who signed a different message with a mismatched key.",
-  },
-  impersonation: {
-    honest: false,
-    label: "Sender impersonation detected",
-    explanation:
-      "Block statistics indicate the signature was produced by a party holding no valid key material.",
-  },
-  replay: {
-    honest: false,
-    label: "Classical replay detected",
-    explanation:
-      "The signature matched a previously issued one, so freshness checks failed across the block set.",
-  },
-  "intercept-fixed": {
-    honest: false,
-    label: "Intercept-resend (fixed basis)",
-    explanation:
-      "Errors cluster in the blocks where the attacker's fixed measurement basis disagreed with the sender.",
-  },
-  "intercept-random": {
-    honest: false,
-    label: "Intercept-resend (random basis)",
-    explanation:
-      "A scattered, low-density error pattern matches an attacker who measured in a random basis each time.",
-  },
-  tampering: {
-    honest: false,
-    label: "Pauli-Z Tampering",
-    explanation:
-      "The pattern of errors matches an attacker who altered the correction step for this signature.",
-  },
-  partial: {
-    honest: false,
-    label: "Partial channel disturbance",
-    explanation:
-      "Only a contiguous run of blocks shows elevated errors, consistent with partial interference.",
-  },
-};
-
-const VISUALIZATION: Record<AttackId, AttackResponse["visualization"]> = {
-  none: "idle",
-  forgery: "swap",
-  impersonation: "swap",
-  replay: "reuse",
-  "intercept-fixed": "grab",
-  "intercept-random": "grab",
-  tampering: "alter",
-  partial: "alter",
-};
-
-const EVE_KNOWLEDGE: Record<AttackId, { has: string[]; hasNot: string[] }> = {
-  none: {
-    has: ["Nothing — no adversary is active this run."],
-    hasNot: [
-      "The sender's private key",
-      "Other verifiers' independent copies",
-      "Any interaction with the channel",
-    ],
-  },
-  forgery: {
-    has: ["1 copy of transmitted data", "The public signature format"],
-    hasNot: [
-      "The sender's private key",
-      "Other verifiers' independent copies",
-      "A valid signature for her chosen message",
-    ],
-  },
-  impersonation: {
-    has: ["Public classical bits", "The message text"],
-    hasNot: [
-      "The sender's private key",
-      "The sender's key pool",
-      "Any verifier's copy",
-    ],
-  },
-  replay: {
-    has: ["1 previously captured signature", "The original message text"],
-    hasNot: [
-      "A fresh key slot for this run",
-      "The sender's private key",
-      "The current channel's states",
-    ],
-  },
-  "intercept-fixed": {
-    has: ["1 measured copy of transmitted states", "Public classical bits"],
-    hasNot: [
-      "Correct basis information",
-      "The sender's private key",
-      "Other verifiers' independent copies",
-    ],
-  },
-  "intercept-random": {
-    has: ["Randomly measured copy of some states", "Public classical bits"],
-    hasNot: [
-      "Basis choices matching the sender",
-      "The sender's private key",
-      "Other verifiers' independent copies",
-    ],
-  },
-  tampering: {
-    has: ["Ability to alter data in transit", "1 copy of transmitted data"],
-    hasNot: [
-      "The sender's private key",
-      "Any verifier's independent copy",
-      "The key pool itself",
-    ],
-  },
-  partial: {
-    has: [
-      "Ability to alter a fraction of transmitted data",
-      "1 copy of transmitted data",
-    ],
-    hasNot: [
-      "The sender's private key",
-      "The untouched portion of the data",
-      "Other verifiers' independent copies",
-    ],
-  },
-};
-
-/* ------------------------------- API -------------------------------- */
-
-export async function init(): Promise<InitResponse> {
-  await sleep(220);
-  return {
-    runId: `run-${Math.random().toString(36).slice(2, 8)}`,
-    seed: Math.floor(Math.random() * 1e9),
-    hardwareProfile: HARDWARE_PROFILE,
-    verifierCountOptions: [1, 2, 3],
-    maxVerifiers: 6,
-  };
+interface MockRun {
+  runId: string;
+  attack: AttackTypeId;
+  n: number;
+  threshold: number;
+  verifierCount: number;
+  seed: number;
+  message: string;
+  createdAt: number;
 }
 
-export function keygen(): KeygenResponse {
-  return {
-    totalSlots: TOTAL_SLOTS,
-    slotsPerBlock: SLOTS_PER_BLOCK,
-    blocks: BLOCKS,
-    bagsPerPosition: BAGS_PER_POSITION,
-    codewordPositions: CODEWORD_POSITIONS,
-  };
+const runs = new Map<string, MockRun>();
+let activeRunId: string | null = null;
+
+function makeRunId(): string {
+  return `run-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function distribute(verifierCount: number): DistributeResponse {
-  return {
-    verifiers: VERIFIER_NAMES.slice(0, verifierCount).map((name) => ({
-      name,
-      received: 0,
-      total: TOTAL_SLOTS,
-      done: false,
-    })),
-  };
-}
-
-export async function channelHealth(
-  ctx: RunContext = {},
-  opts: { forceFail?: boolean } = {},
-): Promise<ChannelHealthResponse> {
-  await sleep(1400, ctx);
-  const passed = !opts.forceFail;
-  const score = passed ? 0.97 : 0.34;
-  return {
-    score,
-    passed,
-    bands: { failBelow: 0.5, warnBelow: 0.8 },
-    explanation: passed
-      ? "Sampled slots matched expected statistics within tolerance."
-      : "Sampled slots deviated from expected statistics beyond tolerance.",
-  };
-}
-
-export async function sign(
-  message: string,
-  verifierNames: string[],
-  ctx: RunContext = {},
-): Promise<SignResponse> {
-  await sleep(240, ctx);
-  const rand = mulberry32(hashString(message));
-  const encoded = Array.from({ length: BLOCKS }, () =>
-    rand() > 0.5 ? "1" : "0",
-  ).join("");
-  return {
-    signatureId: `SIG-${hashString(message).toString(16).toUpperCase().padStart(8, "0")}`,
-    message,
-    encoded,
-    encodedLength: BLOCKS,
-    blocksOpened: BLOCKS,
-    sentTo: verifierNames,
-  };
-}
-
-export async function launchAttack(
-  attackId: AttackId,
-  intensity: number,
-  ctx: RunContext = {},
-): Promise<AttackResponse> {
-  await sleep(320, ctx);
-  return {
-    attackId,
-    label: ATTACK_LABEL[attackId],
-    intensity: attackId === "partial" ? intensity : null,
-    visualization: VISUALIZATION[attackId],
-    eve: EVE_KNOWLEDGE[attackId],
-  };
-}
-
-interface PlannedBlock {
-  verifier: string;
-  block: BlockResult;
-}
-
-/** Everything is computed up-front from the seed so a skip can jump to the end. */
-export function planVerification(
-  verifierNames: string[],
-  attackId: AttackId,
-  intensity: number,
-  seed: number,
-): { plan: PlannedBlock[]; results: VerifierResult[] } {
-  const plan: PlannedBlock[] = [];
-  const results: VerifierResult[] = [];
-
-  for (const [vi, verifier] of verifierNames.entries()) {
-    let failed = 0;
-    const vrand = mulberry32(seed + vi * 7919);
-    const failureRate = failureRateFor(attackId, intensity);
-
-    const blocks: BlockResult[] = Array.from({ length: BLOCKS }, (_, i) => {
-      const willFail = vrand() < failureRate;
-      const mismatches = willFail
-        ? BLOCK_THRESHOLD + 1 + Math.floor(vrand() * 14)
-        : Math.floor(vrand() * BLOCK_THRESHOLD);
-      if (willFail) failed += 1;
-      return {
-        index: i,
-        mismatches,
-        threshold: BLOCK_THRESHOLD,
-        slotCount: SLOTS_PER_BLOCK,
-        status: willFail ? "fail" : "pass",
-      };
-    });
-
-    blocks.forEach((block) => plan.push({ verifier, block }));
-    results.push({
-      name: verifier,
-      checked: 0,
-      total: BLOCKS,
-      failed: 0,
-      verdict: "pending",
-    });
+function hashString(input: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 16777619);
   }
-
-  return { plan, results };
+  return h >>> 0;
 }
 
-function failureRateFor(attackId: AttackId, intensity: number): number {
-  switch (attackId) {
-    case "none":
+function failureRateFor(attack: AttackTypeId, intensity: number): number {
+  switch (attack) {
+    case "honest":
       return 0;
     case "forgery":
     case "impersonation":
@@ -351,257 +96,330 @@ function failureRateFor(attackId: AttackId, intensity: number): number {
       return 0.5;
     case "partial":
       return 0.05 + (intensity / 100) * 0.6;
+    case "collusion":
+      return 0.22;
   }
 }
 
-export async function streamVerification(
-  plan: PlannedBlock[],
-  results: VerifierResult[],
-  onEvent: (event: VerifyEvent) => void,
-  ctx: RunContext = {},
-): Promise<void> {
-  for (const entry of plan) {
-    await sleep(26, ctx);
-    const result = results.find((r) => r.name === entry.verifier);
-    if (!result) continue;
-    result.checked += 1;
-    if (entry.block.status === "fail") result.failed += 1;
-    if (result.checked >= result.total) {
-      result.verdict = result.failed > 0 ? "rejected" : "accepted";
-    }
-    onEvent({
-      verifier: entry.verifier,
-      block: { ...entry.block },
-      checked: result.checked,
-      result: { ...result },
-    });
-  }
+interface PlannedBlock {
+  verifier: string;
+  block: BlockResult;
 }
 
-export function agreementFor(results: VerifierResult[]): Agreement {
-  const decided = results.filter((r) => r.verdict !== "pending");
-  const dissenters = decided
-    .filter((r) => r.verdict !== decided[0]?.verdict)
-    .map((r) => r.name);
-  const verdict =
-    decided.length === results.length && results.length > 0
-      ? decided[0]!.verdict
-      : "pending";
-  return { unanimous: dissenters.length === 0, verdict, dissenters };
-}
-
-export function buildReport(
+/** Computed up-front from the seed so a skip can jump to the end. */
+function planVerification(
   verifierNames: string[],
-  results: VerifierResult[],
-  attack: AttackResponse,
-  channelScore: number,
+  attack: AttackTypeId,
+  intensity: number,
   seed: number,
-  timestamp: string,
-): DashboardReport {
-  const rand = mulberry32(seed);
-  const anyRejected = results.some((r) => r.verdict === "rejected");
-  const verdict = anyRejected ? "rejected" : "accepted";
-  const classification = CLASSIFICATION[attack.attackId];
+): { plan: PlannedBlock[]; results: VerifierResult[] } {
+  const plan: PlannedBlock[] = [];
+  const results: VerifierResult[] = [];
 
-  const fingerprint = fingerprintFor(attack.attackId, attack.intensity ?? 50, rand);
-  const heatmap = buildHeatmap(attack.attackId, attack.intensity ?? 50, rand);
-  const totalBlocks = results[0]?.total ?? 63;
-  const forgeryCurve = buildForgeryCurve(attack.attackId, totalBlocks);
+  for (const [vi, verifier] of verifierNames.entries()) {
+    let failed = 0;
+    const vrand = mulberry32(seed + vi * 7919);
+    const rate = failureRateFor(attack, intensity);
 
-  return {
-    summary: {
-      verdict,
-      attackLabel: attack.label,
-      verifierCount: verifierNames.length,
-      timestamp,
-      seed,
-    },
-    classification: {
-      ...classification,
-      confidence: classification.honest
-        ? 0.94
-        : Number((0.78 + rand() * 0.2).toFixed(2)),
-    },
-    security: {
-      // Deterministic by construction: an untampered signature is always
-      // accepted, and no honest run is ever rejected.
-      honestAcceptanceProbability: 1,
-      observedForgeryProbability: forgeryCurve.points[forgeryCurve.points.length - 1].probability,
-      claimedForgeryBound: forgeryCurve.bound,
-      trials: forgeryCurve.trialsPerPoint * forgeryCurve.points.length,
-      falsePositives: 0,
-    },
-    forgeryCurve,
-    fingerprint,
-    fingerprintLegend: FINGERPRINT_LEGEND,
-    heatmap,
-    channelHealth: channelScore,
-    analytics: {
-      roc: buildRoc(rand),
-      rocAxis: { x: "False alarm rate", y: "Detection rate" },
-      bars: {
-        labels: ["This run", "Expected honest", "Expected attack"],
-        values: [
-          Number((fingerprint[0].value + fingerprint[1].value + fingerprint[2].value).toFixed(3)),
-          0.08,
-          0.76,
-        ],
-      },
-    },
-    evidenceUrl: `/evidence/${seed}.json`,
-  };
-}
+    const blocks: BlockResult[] = Array.from({ length: BLOCKS }, (_, i) => {
+      const willFail = vrand() < rate;
+      const mismatches = willFail
+        ? BLOCK_THRESHOLD + 1 + Math.floor(vrand() * 14)
+        : Math.floor(vrand() * BLOCK_THRESHOLD);
+      if (willFail) failed += 1;
+      return {
+        index: i,
+        mismatches,
+        threshold: BLOCK_THRESHOLD,
+        slotCount: SLOTS_PER_BLOCK,
+        status: willFail ? "fail" : "pass",
+      };
+    });
 
-/**
- * Simulated forgery-probability analysis (PS: "evaluate through forgery
- * probability analysis"). In the real system the quantum engine supplies this
- * curve; here it is modelled as a clean per-block halving, which is what the
- * protocol claims, and it is suppressed when no attack was launched.
- */
-function buildForgeryCurve(attackId: AttackId, totalBlocks: number): ForgeryCurve {
-  const TRIALS = 100_000;
-  const honest = attackId === "none";
-  const checkpoints = [1, 2, 4, 8, 16, 32, totalBlocks]
-    .filter((n, i, all) => n <= totalBlocks && all.indexOf(n) === i)
-    .filter((n, i, all) => i === all.length - 1 || n < totalBlocks);
-
-  const points = checkpoints.map((blocks) => ({
-    blocks,
-    probability: honest ? 0 : Number(Math.pow(0.5, blocks / 2).toPrecision(3)),
-  }));
-
-  const last = points[points.length - 1];
-  return {
-    points,
-    bound: honest ? "not evaluated (no attack launched)" : `≤ ${last.probability.toExponential(1)} at ${totalBlocks} blocks`,
-    trialsPerPoint: TRIALS,
-  };
-}
-
-function fingerprintFor(
-  attackId: AttackId,
-  intensity: number,
-  rand: () => number,
-): FingerprintAxis[] {
-  const jitter = () => (rand() - 0.5) * 0.08;
-  const base: Record<AttackId, [number, number, number]> = {
-    none: [0.06, 0.05, 0.07],
-    forgery: [0.72, 0.31, 0.28],
-    impersonation: [0.66, 0.55, 0.22],
-    replay: [0.24, 0.68, 0.35],
-    "intercept-fixed": [0.33, 0.74, 0.41],
-    "intercept-random": [0.48, 0.44, 0.39],
-    tampering: [0.21, 0.27, 0.83],
-    partial: [0.58, 0.29, 0.19],
-  };
-  const scale = attackId === "partial" ? intensity / 100 : 1;
-  const [a, b, c] = base[attackId];
-  return [
-    { key: "a", label: "Errors in Test Type A", value: clamp01(a * scale + jitter()) },
-    { key: "b", label: "Errors in Test Type B", value: clamp01(b * scale + jitter()) },
-    { key: "c", label: "Errors in Test Type C", value: clamp01(c * scale + jitter()) },
-  ];
-}
-
-const FINGERPRINT_LEGEND: FingerprintLegendEntry[] = [
-  { attackId: "none", label: "No attack", pattern: [0.06, 0.05, 0.07] },
-  { attackId: "tampering", label: "Pauli-Z tampering", pattern: [0.21, 0.27, 0.83] },
-  { attackId: "intercept-fixed", label: "Intercept (fixed)", pattern: [0.33, 0.74, 0.41] },
-  { attackId: "intercept-random", label: "Intercept (random)", pattern: [0.48, 0.44, 0.39] },
-  { attackId: "replay", label: "Replay", pattern: [0.24, 0.68, 0.35] },
-  { attackId: "forgery", label: "Forgery", pattern: [0.72, 0.31, 0.28] },
-  { attackId: "impersonation", label: "Impersonation", pattern: [0.66, 0.55, 0.22] },
-  { attackId: "partial", label: "Partial", pattern: [0.58, 0.29, 0.19] },
-];
-
-function buildHeatmap(
-  attackId: AttackId,
-  intensity: number,
-  rand: () => number,
-): number[] {
-  const scale = attackId === "partial" ? intensity / 100 : 1;
-  const center = Math.floor(BLOCKS / 2);
-  return Array.from({ length: BLOCKS }, (_, i) => {
-    if (attackId === "none") return rand() * 0.08;
-    if (attackId === "partial") {
-      const inBand = i > center - 14 && i < center + 14 ? 1 : 0.12;
-      return clamp01((inBand * scale * (0.6 + rand() * 0.4)) as number);
-    }
-    if (attackId === "tampering") {
-      const periodic = i % 7 === 0 ? 1 : 0.35;
-      return clamp01(periodic * scale * (0.55 + rand() * 0.45));
-    }
-    return clamp01(scale * (0.25 + rand() * 0.7));
-  });
-}
-
-function buildRoc(rand: () => number): AnalyticsPoint[] {
-  return Array.from({ length: 14 }, (_, i) => {
-    const x = i / 13;
-    return {
-      x: Number(x.toFixed(3)),
-      y: Number(Math.min(1, Math.pow(x, 0.32) + (rand() - 0.5) * 0.05).toFixed(3)),
-    };
-  });
-}
-
-export function buildLogs(
-  attack: AttackResponse,
-  results: VerifierResult[],
-  channelScore: number,
-  startedAt: number,
-): LogEntry[] {
-  const t = (offset: number) =>
-    new Date(startedAt + offset).toISOString().replace("T", " ").slice(0, 19);
-  const rows: LogEntry[] = [
-    { timestamp: t(0), type: "RUN", description: "Simulation initialised" },
-    { timestamp: t(1200), type: "KEYGEN", description: "Key pool generated" },
-    {
-      timestamp: t(2600),
-      type: "DISTRIBUTE",
-      description: `Keys distributed to ${results.length} verifier(s)`,
-    },
-    {
-      timestamp: t(5200),
-      type: "CHANNEL",
-      description: `Channel health check scored ${channelScore.toFixed(2)} / 1.00`,
-    },
-    { timestamp: t(6400), type: "SIGN", description: "Message signed" },
-    {
-      timestamp: t(7100),
-      type: "ATTACK",
-      description:
-        attack.attackId === "none"
-          ? "No attack selected"
-          : `Attack scenario launched: ${attack.label}`,
-    },
-    ...results.map((r, i) => ({
-      timestamp: t(8000 + i * 400),
-      type: "VERIFY",
-      description: `${r.name}: ${r.verdict.toUpperCase()} (${r.failed}/${r.total} blocks failed)`,
-    })),
-  ];
-  return rows;
-}
-
-export async function fetchEvidence(report: DashboardReport): Promise<Blob> {
-  await sleep(180);
-  return new Blob([JSON.stringify(report, null, 2)], {
-    type: "application/json",
-  });
-}
-
-/* ------------------------------ helpers ------------------------------ */
-
-function hashString(input: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < input.length; i += 1) {
-    h ^= input.charCodeAt(i);
-    h = Math.imul(h, 16777619);
+    blocks.forEach((block) => plan.push({ verifier, block }));
+    results.push({ name: verifier, checked: 0, total: BLOCKS, failed: 0, verdict: "pending" });
   }
-  return h >>> 0;
+
+  return { plan, results };
 }
 
-function clamp01(value: number): number {
-  return Math.min(1, Math.max(0, Number(value.toFixed(3))));
+const findRun = (runId: string): MockRun => {
+  const run = runs.get(runId);
+  if (!run) throw new ApiErrorClass("RUN_NOT_FOUND", `No run ${runId}`, 404);
+  return run;
+};
+
+/* ------------------------------------------------------------------ *
+ *  QdsApi implementation
+ * ------------------------------------------------------------------ */
+
+export const mockApi: QdsApi = {
+  async getActive(): Promise<ActiveResponse> {
+    await sleep(60);
+    const run = activeRunId ? runs.get(activeRunId) : null;
+    return {
+      active: run !== undefined && run !== null,
+      runId: activeRunId,
+      phase: run ? "verification" : null,
+    };
+  },
+
+  async preview(attack, n): Promise<PreviewResponse> {
+    await sleep(120);
+    return {
+      attackType: attack,
+      n,
+      threshold: 0.1,
+      predictedDetectionConfidence:
+        attack === "honest" ? 0 : Number((0.55 + Math.min(0.4, n / 4000)).toFixed(2)),
+    };
+  },
+
+  async createRun(attack, n, threshold, verifierCount): Promise<RunResponse> {
+    await sleep(320);
+    const run: MockRun = {
+      runId: makeRunId(),
+      attack,
+      n,
+      threshold,
+      verifierCount,
+      seed: Math.floor(Math.random() * 1e9),
+      message: "",
+      createdAt: Date.now(),
+    };
+    runs.set(run.runId, run);
+    activeRunId = run.runId;
+    return {
+      runId: run.runId,
+      attackType: attack,
+      n,
+      threshold,
+      seed: run.seed,
+    };
+  },
+
+  async getKeygen(runId): Promise<KeygenResponse> {
+    findRun(runId);
+    await sleep(260);
+    return {
+      runId,
+      totalSlots: TOTAL_SLOTS,
+      slotsPerBlock: SLOTS_PER_BLOCK,
+      blocks: BLOCKS,
+      bagsPerPosition: BAGS_PER_POSITION,
+      codewordPositions: CODEWORD_POSITIONS,
+    };
+  },
+
+  async getDistribution(runId): Promise<DistributionResponse> {
+    const run = findRun(runId);
+    await sleep(220);
+    return {
+      runId,
+      verifiers: VERIFIER_NAMES.slice(0, run.verifierCount).map((name) => ({
+        name,
+        received: TOTAL_SLOTS,
+        total: TOTAL_SLOTS,
+        done: true,
+      })),
+    };
+  },
+
+  async getSigning(runId): Promise<SignResponse> {
+    const run = findRun(runId);
+    await sleep(280);
+    const rand = mulberry32(run.seed ^ hashString(run.message || "message"));
+    const encoded = Array.from({ length: BLOCKS }, () =>
+      rand() > 0.5 ? "1" : "0",
+    ).join("");
+    return {
+      runId,
+      signatureId: `SIG-${hashString(run.message || "message").toString(16).toUpperCase().padStart(8, "0")}`,
+      message: run.message,
+      encoded,
+      encodedLength: BLOCKS,
+      blocksOpened: BLOCKS,
+      sentTo: VERIFIER_NAMES.slice(0, run.verifierCount),
+    };
+  },
+
+  async streamVerification(runId, onEvent, ctx = {}): Promise<VerifierResult[]> {
+    const run = findRun(runId);
+    const names = VERIFIER_NAMES.slice(0, run.verifierCount);
+    const { plan, results } = planVerification(
+      names,
+      run.attack,
+      50,
+      run.seed,
+    );
+
+    for (const entry of plan) {
+      await sleep(18, ctx);
+      const result = results.find((r) => r.name === entry.verifier);
+      if (!result) continue;
+      result.checked += 1;
+      if (entry.block.status === "fail") result.failed += 1;
+      if (result.checked >= result.total) {
+        result.verdict = result.failed > 0 ? "rejected" : "accepted";
+      }
+      onEvent({
+        verifier: entry.verifier,
+        block: { ...entry.block },
+        checked: result.checked,
+        result: { ...result },
+      });
+    }
+    return results.map((r) => ({ ...r }));
+  },
+
+  async getResult(runId): Promise<ResultResponse> {
+    const run = findRun(runId);
+    await sleep(180);
+    const names = VERIFIER_NAMES.slice(0, run.verifierCount);
+    const { results } = planVerification(names, run.attack, 50, run.seed);
+    // resolve verdicts
+    for (const r of results) r.verdict = r.failed > 0 ? "rejected" : "accepted";
+
+    const totalChecked = results.reduce((s, r) => s + r.total, 0);
+    const totalMismatch = results.reduce((s, r) => s + r.failed, 0);
+    const mismatchRate = totalChecked ? totalMismatch / totalChecked : 0;
+    const anyRejected = results.some((r) => r.verdict === "rejected");
+
+    const flaggedBy: ResultResponse["flaggedBy"] =
+      run.attack === "honest"
+        ? "none"
+        : run.attack === "collusion"
+          ? "verifier-cross-check"
+          : mismatchRate > 0.15
+            ? "quantum-error-rate"
+            : "classical-mac";
+
+    return {
+      runId,
+      verdict: anyRejected ? "rejected" : "accepted",
+      mismatchRate: Number(mismatchRate.toFixed(4)),
+      threshold: BLOCK_THRESHOLD / SLOTS_PER_BLOCK,
+      confidence: anyRejected
+        ? "this error rate has a 1-in-10^4 chance under an honest run"
+        : "consistent with an honest run",
+      flaggedBy,
+      flaggedDiff:
+        run.attack === "honest" || run.attack === "collusion"
+          ? undefined
+          : [
+              { sent: "01101001…", received: "01101101…" },
+              { sent: "basis: Z", received: "basis: X" },
+            ],
+      verifiers: results,
+    };
+  },
+
+  async getArbitration(runId): Promise<ArbitrationResponse> {
+    const run = findRun(runId);
+    await sleep(200);
+    const [v1, v2] = VERIFIER_NAMES;
+    return {
+      runId,
+      verifiers: [
+        { name: v1, mismatchRate: 0.04, verdict: "accepted", timestamp: new Date(run.createdAt + 8200).toISOString() },
+        { name: v2, mismatchRate: 0.31, verdict: "rejected", timestamp: new Date(run.createdAt + 8400).toISOString() },
+      ],
+      crossCheckStatus: "diverged",
+      arbiterRuling: `${v2}'s report is inconsistent with ${v1}'s independent measurement; the cross-check comparison diverged, so ${v1}'s accepted verdict stands.`,
+    };
+  },
+
+  async getStatsSummary(): Promise<StatsSummary> {
+    await sleep(160);
+    return {
+      totalRuns: 1284,
+      detectionRate: 0.982,
+      avgMismatchHonest: 0.071,
+      avgMismatchAttacked: 0.384,
+    };
+  },
+
+  async getByAttackType(): Promise<ByAttackTypeRow[]> {
+    await sleep(160);
+    const rows: ByAttackTypeRow[] = [
+      { attackType: "honest", label: attackLabel("honest"), runs: 402, detected: 0, detectionRate: 0 },
+      { attackType: "forgery", label: attackLabel("forgery"), runs: 188, detected: 188, detectionRate: 1 },
+      { attackType: "impersonation", label: attackLabel("impersonation"), runs: 121, detected: 119, detectionRate: 0.98 },
+      { attackType: "replay", label: attackLabel("replay"), runs: 96, detected: 94, detectionRate: 0.98 },
+      { attackType: "intercept-fixed", label: attackLabel("intercept-fixed"), runs: 143, detected: 141, detectionRate: 0.99 },
+      { attackType: "intercept-random", label: attackLabel("intercept-random"), runs: 117, detected: 104, detectionRate: 0.89 },
+      { attackType: "partial", label: attackLabel("partial"), runs: 132, detected: 97, detectionRate: 0.73 },
+      { attackType: "tampering", label: attackLabel("tampering"), runs: 84, detected: 84, detectionRate: 1 },
+      { attackType: "collusion", label: attackLabel("collusion"), runs: 1, detected: 1, detectionRate: 1 },
+    ];
+    return rows;
+  },
+
+  async getHistogram(): Promise<HistogramResponse> {
+    await sleep(160);
+    const bins = ["0.00–0.05", "0.05–0.10", "0.10–0.15", "0.15–0.20", "0.20–0.30", "0.30+"];
+    return {
+      bins,
+      honest: [402, 0, 0, 0, 0, 0],
+      attacked: [2, 9, 24, 61, 188, 118],
+    };
+  },
+
+  async getForgeryComparison(): Promise<ForgeryComparison> {
+    await sleep(140);
+    return {
+      classical: 0.5,
+      quantum: 1e-9,
+      classicalLabel: "RSA / ECC at 128-bit security",
+      quantumLabel: "Teleportation-based QDS at 63 blocks",
+    };
+  },
+
+  async getLog(page, filter): Promise<LogPage> {
+    await sleep(140);
+    const all: LogEntry[] = [
+      { timestamp: "2026-09-28 14:02:11", attackType: "honest", label: attackLabel("honest"), runId: "run-a1b2c3", verdict: "accepted", flaggedBy: "none", detected: false },
+      { timestamp: "2026-09-28 14:05:47", attackType: "forgery", label: attackLabel("forgery"), runId: "run-d4e5f6", verdict: "rejected", flaggedBy: "quantum-error-rate", detected: true },
+      { timestamp: "2026-09-28 14:09:03", attackType: "intercept-fixed", label: attackLabel("intercept-fixed"), runId: "run-g7h8i9", verdict: "rejected", flaggedBy: "quantum-error-rate", detected: true },
+      { timestamp: "2026-09-28 14:12:38", attackType: "replay", label: attackLabel("replay"), runId: "run-j1k2l3", verdict: "rejected", flaggedBy: "classical-mac", detected: true },
+      { timestamp: "2026-09-28 14:16:52", attackType: "impersonation", label: attackLabel("impersonation"), runId: "run-m4n5o6", verdict: "rejected", flaggedBy: "quantum-error-rate", detected: true },
+      { timestamp: "2026-09-28 14:20:19", attackType: "honest", label: attackLabel("honest"), runId: "run-p7q8r9", verdict: "accepted", flaggedBy: "none", detected: false },
+      { timestamp: "2026-09-28 14:24:44", attackType: "tampering", label: attackLabel("tampering"), runId: "run-s1t2u3", verdict: "rejected", flaggedBy: "quantum-error-rate", detected: true },
+      { timestamp: "2026-09-28 14:28:07", attackType: "intercept-random", label: attackLabel("intercept-random"), runId: "run-v4w5x6", verdict: "rejected", flaggedBy: "quantum-error-rate", detected: true },
+      { timestamp: "2026-09-28 14:31:30", attackType: "partial", label: attackLabel("partial"), runId: "run-y7z8a1", verdict: "rejected", flaggedBy: "quantum-error-rate", detected: true },
+    ];
+    const filtered = filter === "all" ? all : all.filter((e) => e.attackType === filter);
+    return { entries: filtered, page, totalPages: 1, total: filtered.length };
+  },
+
+  async exportLog(): Promise<Blob> {
+    await sleep(120);
+    const header = "timestamp,attack_type,run_id,verdict,flagged_by\n";
+    return new Blob([header], { type: "text/csv" });
+  },
+};
+
+/* ------------------------------------------------------------------ *
+ *  Exported helpers for the store
+ * ------------------------------------------------------------------ */
+
+export function setActiveRun(runId: string | null): void {
+  activeRunId = runId;
+}
+
+export function setRunMessage(runId: string, message: string): void {
+  const run = runs.get(runId);
+  if (run) run.message = message;
+}
+
+export function attackOption(id: AttackTypeId): AttackOption {
+  return ATTACK_OPTIONS.find((a) => a.id === id) ?? ATTACK_OPTIONS[0]!;
+}
+
+export function getRunAttack(runId: string): AttackTypeId {
+  return runs.get(runId)?.attack ?? "honest";
+}
+
+export function getVerifierNames(count: number): string[] {
+  return VERIFIER_NAMES.slice(0, count);
 }

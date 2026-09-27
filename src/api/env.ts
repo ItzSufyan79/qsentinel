@@ -19,4 +19,18 @@ const fromNode = (
 
 export const ENV: Record<string, string | undefined> = { ...fromNode, ...fromVite };
 
+/**
+ * Live read. `ENV` is a snapshot taken at module load, which is right for the
+ * mode but wrong for values a test may change between load and a request.
+ */
+export function env(key: string): string | undefined {
+  return fromVite?.[key] ?? fromNodeLive()[key];
+}
+
+function fromNodeLive(): Record<string, string | undefined> {
+  return (
+    globalThis as { process?: { env?: Record<string, string | undefined> } }
+  ).process?.env ?? {};
+}
+
 export type ApiMode = "mock" | "http";

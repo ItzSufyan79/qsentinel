@@ -135,7 +135,7 @@ const PROBE = `(() => {
     if (!text || el.children.length !== 0) continue;
 
     const size = parseFloat(cs.fontSize);
-    if (size < 9) {
+    if (size < 12) {
       res.tinyText.push({ size: Math.round(size * 10) / 10, text: text.slice(0, 44) });
       continue;
     }

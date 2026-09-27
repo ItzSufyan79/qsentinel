@@ -1,25 +1,116 @@
 /**
  * Wire types for the QSentinel backend.
  *
- * Rule from the spec: the frontend never calculates thresholds, counts or
- * percentages. Everything numeric in the UI arrives through these shapes.
- * All values here are examples used by the mock backend for layout only.
+ * Contract source: UI/UX design report, section 6 (data contract summary).
+ * Every component that displays live or historical data is mapped to one of
+ * these endpoints. If a component has no endpoint, it is static.
+ *
+ * HARD RULE (from the problem statement): the frontend never calculates a
+ * threshold, a count, a percentage, a probability or a verdict. Every number
+ * the UI displays arrives in one of these shapes.
  */
 
-export type PageId = 1 | 2 | 3 | 4 | 5 | 6;
+import type { ReactNode } from "react";
 
-export type ExplainMode = "simple" | "technical";
+/* ------------------------------------------------------------------ *
+ *  Attack model — the nine options from spec section 4.2
+ * ------------------------------------------------------------------ */
 
-export type AttackId =
-  | "none"
+export type AttackTypeId =
+  | "honest"
   | "forgery"
   | "impersonation"
   | "replay"
   | "intercept-fixed"
   | "intercept-random"
+  | "partial"
   | "tampering"
-  | "partial";
+  | "collusion";
 
+export interface AttackOption {
+  id: AttackTypeId;
+  label: string;
+  /** one line: what it does and which phase it hits (static lookup) */
+  description: string;
+  /** true for the attacks that interpose a node on the quantum channel */
+  intercepts: boolean;
+  hasIntensity: boolean;
+}
+
+export const ATTACK_OPTIONS: AttackOption[] = [
+  {
+    id: "honest",
+    label: "Honest baseline",
+    description: "No adversary. Establishes the error-rate floor every other run is judged against.",
+    intercepts: false,
+    hasIntensity: false,
+  },
+  {
+    id: "forgery",
+    label: "Forgery",
+    description: "Signs a different message with a mismatched key. Hits the signing phase.",
+    intercepts: false,
+    hasIntensity: false,
+  },
+  {
+    id: "impersonation",
+    label: "Impersonation",
+    description: "A party with no key material claims to be the sender. Hits the signing phase.",
+    intercepts: false,
+    hasIntensity: false,
+  },
+  {
+    id: "replay",
+    label: "Intercept-resend replay",
+    description: "Replays a previously captured signature. Freshness checks fail across the block set.",
+    intercepts: true,
+    hasIntensity: false,
+  },
+  {
+    id: "intercept-fixed",
+    label: "Fixed-basis intercept",
+    description: "Measures every state in one fixed basis. Errors cluster where that basis disagreed.",
+    intercepts: true,
+    hasIntensity: false,
+  },
+  {
+    id: "intercept-random",
+    label: "Random-basis stealth intercept",
+    description: "Measures in a random basis each time. Produces a scattered, low-density error pattern.",
+    intercepts: true,
+    hasIntensity: false,
+  },
+  {
+    id: "partial",
+    label: "Partial / stealth intercept",
+    description: "Alters only a fraction of the transmitted data. Intensity controls how much.",
+    intercepts: true,
+    hasIntensity: true,
+  },
+  {
+    id: "tampering",
+    label: "Classical channel tampering",
+    description: "Alters the Pauli correction step in transit. Produces a periodic error signature.",
+    intercepts: true,
+    hasIntensity: false,
+  },
+  {
+    id: "collusion",
+    label: "Verifier collusion",
+    description: "Two verifiers report conflicting outcomes. Routed to the Arbitration page.",
+    intercepts: false,
+    hasIntensity: false,
+  },
+];
+
+export const attackLabel = (id: AttackTypeId): string =>
+  ATTACK_OPTIONS.find((a) => a.id === id)?.label ?? id;
+
+/* ------------------------------------------------------------------ *
+ *  Shared domain types
+ * ------------------------------------------------------------------ */
+
+export type Verdict = "accepted" | "rejected";
 export type BlockStatus = "pending" | "pass" | "fail";
 
 export interface Stat {
@@ -32,16 +123,28 @@ export interface InitResponse {
   seed: number;
   hardwareProfile: { label: string; stats: Stat[] };
   verifierCountOptions: number[];
-  maxVerifiers: number;
 }
 
-export interface KeygenProgress {
-  created: number;
-  total: number;
-  done: boolean;
+/** GET /api/simulate/preview */
+export interface PreviewResponse {
+  attackType: AttackTypeId;
+  n: number;
+  threshold: number;
+  /** predicted detection confidence at this N, so the preview is never blank */
+  predictedDetectionConfidence: number;
+}
+
+/** POST /api/simulate/run */
+export interface RunResponse {
+  runId: string;
+  attackType: AttackTypeId;
+  n: number;
+  threshold: number;
+  seed: number;
 }
 
 export interface KeygenResponse {
+  runId: string;
   totalSlots: number;
   slotsPerBlock: number;
   blocks: number;
@@ -56,19 +159,15 @@ export interface VerifierTarget {
   done: boolean;
 }
 
-export interface DistributeResponse {
+/** GET /api/simulate/{run_id}/distribution */
+export interface DistributionResponse {
+  runId: string;
   verifiers: VerifierTarget[];
 }
 
-export interface ChannelHealthResponse {
-  score: number;
-  passed: boolean;
-  /** gauge banding, read from the backend, not hard-coded in the gauge */
-  bands: { failBelow: number; warnBelow: number };
-  explanation: string;
-}
-
+/** GET /api/simulate/{run_id}/signing */
 export interface SignResponse {
+  runId: string;
   signatureId: string;
   message: string;
   /** one char per encoded block, e.g. "0110…" */
@@ -83,8 +182,9 @@ export interface EveKnowledge {
   hasNot: string[];
 }
 
+/** Attack detail, echoed by the signing/verification endpoints. */
 export interface AttackResponse {
-  attackId: AttackId;
+  attackType: AttackTypeId;
   label: string;
   intensity: number | null;
   /** which animation the Eve node should play */
@@ -96,7 +196,6 @@ export interface BlockResult {
   index: number;
   mismatches: number;
   threshold: number;
-  /** slots tested in this block (for "2 out of 128" style readouts) */
   slotCount: number;
   status: BlockStatus;
 }
@@ -113,187 +212,132 @@ export interface VerifyEvent {
   verifier: string;
   block: BlockResult;
   checked: number;
-  /** immutable snapshot of the whole verifier row after this block */
   result: VerifierResult;
 }
 
-export interface Agreement {
-  unanimous: boolean;
-  verdict: "accepted" | "rejected" | "pending";
-  dissenters: string[];
+/** GET /api/simulate/{run_id}/result */
+export interface ResultResponse {
+  runId: string;
+  verdict: Verdict;
+  /** observed mismatch rate across all verified blocks */
+  mismatchRate: number;
+  threshold: number;
+  /** p-value style: "this error rate has a 1-in-X chance under an honest run" */
+  confidence: string;
+  flaggedBy: "quantum-error-rate" | "classical-mac" | "verifier-cross-check" | "none";
+  /** what the attacker changed vs. what the signer sent — only when not honest */
+  flaggedDiff?: { sent: string; received: string }[];
+  verifiers: VerifierResult[];
 }
 
-export interface FingerprintAxis {
-  key: "a" | "b" | "c";
-  label: string;
-  value: number;
-}
-
-export interface FingerprintLegendEntry {
-  attackId: AttackId;
-  label: string;
-  pattern: [number, number, number];
-}
-
-export interface AnalyticsPoint {
-  x: number;
-  y: number;
-}
-
-export interface BarComparison {
-  labels: string[];
-  values: number[];
-}
-
-export interface DashboardReport {
-  summary: {
-    verdict: "accepted" | "rejected";
-    attackLabel: string;
-    verifierCount: number;
+/** GET /api/simulate/{run_id}/arbitration */
+export interface ArbitrationResponse {
+  runId: string;
+  verifiers: {
+    name: string;
+    mismatchRate: number;
+    verdict: Verdict;
     timestamp: string;
-    seed: number;
-  };
-  security?: SecuritySummary;
-  forgeryCurve?: ForgeryCurve;
-  classification: {
-    honest: boolean;
-    label: string;
-    confidence: number;
-    explanation: string;
-  };
-  fingerprint: FingerprintAxis[];
-  fingerprintLegend: FingerprintLegendEntry[];
-  heatmap: number[];
-  channelHealth: number;
-  analytics: {
-    roc: AnalyticsPoint[];
-    rocAxis: { x: string; y: string };
-    bars: BarComparison;
-  };
-  evidenceUrl: string;
+  }[];
+  crossCheckStatus: "matched" | "diverged";
+  arbiterRuling: string;
 }
+
+/** GET /api/simulate/active — polled by the global nav badge */
+export interface ActiveResponse {
+  active: boolean;
+  runId: string | null;
+  phase: string | null;
+}
+
+/* ------------------------------------------------------------------ *
+ *  Analytics dashboard
+ * ------------------------------------------------------------------ */
+
+/** GET /api/stats/summary */
+export interface StatsSummary {
+  totalRuns: number;
+  detectionRate: number;
+  avgMismatchHonest: number;
+  avgMismatchAttacked: number;
+}
+
+/** GET /api/stats/by-attack-type */
+export interface ByAttackTypeRow {
+  attackType: AttackTypeId;
+  label: string;
+  runs: number;
+  detected: number;
+  detectionRate: number;
+}
+
+/** GET /api/stats/histogram */
+export interface HistogramResponse {
+  bins: string[];
+  honest: number[];
+  attacked: number[];
+}
+
+/** GET /api/stats/forgery-comparison */
+export interface ForgeryComparison {
+  /** classical RSA/ECC forgery probability at equivalent security */
+  classical: number;
+  quantum: number;
+  classicalLabel: string;
+  quantumLabel: string;
+}
+
+/* ------------------------------------------------------------------ *
+ *  Event log
+ * ------------------------------------------------------------------ */
 
 export interface LogEntry {
   timestamp: string;
-  type: string;
-  description: string;
-}
-
-/* ------------------------------------------------------------------ *
- * Security claims — the three numbers judges will ask for.
- * Optional: a backend that does not report them still renders fine.
- * ------------------------------------------------------------------ */
-
-export interface SecuritySummary {
-  /** honest signatures must be accepted with probability 1 */
-  honestAcceptanceProbability: number;
-  /** empirical forgery success rate at the current block count */
-  observedForgeryProbability: number;
-  /** the bound the protocol claims, e.g. "≤ 1e-9 per block" */
-  claimedForgeryBound: string;
-  /** shots sampled to get the numbers above */
-  trials: number;
-  /** honest runs that produced a false rejection — must be 0 */
-  falsePositives: number;
-}
-
-/* ------------------------------------------------------------------ *
- * Protocol primitives — feeds the Protocol page (PS: "Key Components").
- * The frontend draws these; it never computes amplitudes or probabilities.
- * ------------------------------------------------------------------ */
-
-/** Pauli operators. I = nothing applied. */
-export type PauliOperator = "I" | "X" | "Y" | "Z";
-
-/** Measurement basis. Z is the computational basis, X/Y are superposition. */
-export type MeasurementBasis = "X" | "Y" | "Z";
-
-export interface Complex {
-  re: number;
-  im: number;
-}
-
-/** Squared magnitude of an amplitude, in [0, 1]. Sum over a state = 1. */
-export interface Amplitude {
+  attackType: AttackTypeId;
   label: string;
-  re: number;
-  im: number;
-  /** |amplitude|^2, sent precomputed so the UI never squares anything */
-  probability: number;
+  runId: string;
+  verdict: Verdict;
+  flaggedBy: string;
+  detected: boolean;
 }
 
-export interface BellStateResponse {
-  /** e.g. "|Φ+⟩ = (|00⟩ + |11⟩)/√2" */
-  formula: string;
-  label: string;
-  /** the four computational-basis labels: "00", "01", "10", "11" */
-  basis: string[];
-  amplitudes: Amplitude[];
-  /** measured pairs and how often they agreed — the entanglement evidence */
-  correlationTrials: number;
-  correlationAgreement: number;
-}
-
-export interface TeleportStep {
-  index: number;
-  /** short machine name, e.g. "measure" | "classify" | "correct" */
-  stage: "prepare" | "share" | "measure" | "classify" | "correct" | "done";
-  caption: string;
-  detail: string;
-  /** the two classical bits Alice sends Bob */
-  classicalBits: string;
-  /** operator Bob applies as a result */
-  correction: PauliOperator;
-  /** state after this step, for the state panel */
-  amplitudes: Amplitude[];
-}
-
-export interface TeleportTrace {
-  /** the payload qubit, e.g. |ψ⟩ */
-  inputState: string;
-  steps: TeleportStep[];
-  /** Bob's state equals the input state exactly — true, not asserted by the UI */
-  statePreserved: boolean;
-}
-
-export interface MeasurementSeries {
-  id: string;
-  title: string;
-  basis: MeasurementBasis;
-  /** one bin per outcome, e.g. 8 shots */
-  shots: number;
-  bins: { outcome: string; count: number }[];
-  /** the distribution a legitimate run must match */
-  expected: number[];
-  /** statistical deviation, 0 = perfect match */
-  deviation: number;
-  verdict: "match" | "deviant";
-}
-
-export interface ForgeryPoint {
-  blocks: number;
-  /** empirical success rate at this block count */
-  probability: number;
-}
-
-export interface ForgeryCurve {
-  points: ForgeryPoint[];
-  bound: string;
-  trialsPerPoint: number;
+/** GET /api/log */
+export interface LogPage {
+  entries: LogEntry[];
+  page: number;
+  totalPages: number;
+  total: number;
 }
 
 /* ------------------------------------------------------------------ *
- * Evidence export
+ *  Error shape
  * ------------------------------------------------------------------ */
 
-export interface EvidenceReport {
-  generator: string;
-  problemStatement: string;
-  exportedAt: string;
-  run: DashboardReport;
-  security?: SecuritySummary;
-  forgeryCurve?: ForgeryCurve;
-  /** hash chain over the log, so the export is tamper-evident */
-  logChain: { length: number; head: string };
+export type ApiErrorCode =
+  | "NETWORK"
+  | "TIMEOUT"
+  | "ABORTED"
+  | "RUN_NOT_FOUND"
+  | "INVALID_STATE"
+  | "CHANNEL_UNTRUSTED"
+  | "BACKEND_ERROR";
+
+export class ApiError extends Error {
+  readonly code: ApiErrorCode;
+  readonly status: number;
+  readonly detail?: string;
+
+  constructor(code: ApiErrorCode, message: string, status = 0, detail?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.code = code;
+    this.status = status;
+    this.detail = detail;
+  }
 }
 
+/* ------------------------------------------------------------------ *
+ *  Small shared UI helpers
+ * ------------------------------------------------------------------ */
+
+export type IconName = ReactNode;

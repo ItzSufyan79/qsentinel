@@ -11,7 +11,7 @@
 import { httpApi } from "./client";
 import { ENV, type ApiMode } from "./env";
 import type { QdsApi } from "./contract";
-import { mockApi } from "./mockAdapter";
+import { mockApi } from "./mockApi";
 
 const mode: ApiMode = ENV.VITE_API_MODE === "http" ? "http" : "mock";
 
@@ -19,6 +19,5 @@ export const api: QdsApi = mode === "http" ? httpApi : mockApi;
 
 export const API_MODE = mode;
 
-export { ATTACK_CATALOGUE } from "./catalogue";
 export { ApiError, ROUTES, type QdsApi, type RunContext } from "./contract";
 export * from "./types";

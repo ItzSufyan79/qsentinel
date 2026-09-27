@@ -1,193 +1,134 @@
 /**
- * Headless smoke test for the QSentinel flow state machine.
- * Run: npm run smoke
+ * Headless smoke test for the QSentinel contract.
  *
- * Stubs the handful of browser globals the store touches, then drives the
- * five-page sequence the same way a user would and asserts each transition.
+ * Drives the mock backend through the whole flow — preview, run creation,
+ * every live-simulation phase, the streamed verification, the result,
+ * arbitration, analytics and the event log — and asserts the shapes the UI
+ * depends on. No browser needed.
  */
-import assert from "node:assert/strict";
 
-const root = globalThis as unknown as {
-  document: { documentElement: Record<string, unknown> };
-  window: Record<string, unknown>;
-};
+import { mockApi } from "../src/api/mockApi";
+import { ApiError } from "../src/api";
+import { ATTACK_OPTIONS } from "../src/api/types";
 
-root.document = {
-  documentElement: {
-    style: {
-      setProperty() {},
-      getPropertyValue() {
-        return "1";
-      },
-    },
-    classList: { toggle() {}, add() {}, remove() {} },
-  },
-} as never;
+let passed = 0;
+let failed = 0;
 
-root.window = {
-  scrollTo() {},
-  setTimeout: globalThis.setTimeout.bind(globalThis),
-  clearTimeout: globalThis.clearTimeout.bind(globalThis),
-} as never;
+function check(name: string, cond: boolean) {
+  if (cond) {
+    passed += 1;
+    console.log(`  ✓ ${name}`);
+  } else {
+    failed += 1;
+    console.error(`  ✗ ${name}`);
+  }
+}
 
-const { useFlow } = await import("../src/state/flowStore");
+async function main() {
+  console.log("\n— attack catalogue —");
+  check("nine attack options", ATTACK_OPTIONS.length === 9);
+  check("every option has a label", ATTACK_OPTIONS.every((a) => a.label.length > 0));
+  check("every option has a description", ATTACK_OPTIONS.every((a) => a.description.length > 0));
+  check(
+    "collusion is present (arbitration path)",
+    ATTACK_OPTIONS.some((a) => a.id === "collusion"),
+  );
 
-const store = () => useFlow.getState();
-const step = (name: string) => console.log(`✓ ${name}`);
+  console.log("\n— run lifecycle —");
+  const preview = await mockApi.preview("forgery", 200, 0.1);
+  check("preview returns a confidence", preview.predictedDetectionConfidence > 0);
+  check("preview echoes the attack", preview.attackType === "forgery");
 
-/* 1 — boot + configuration */
-await store().boot();
-assert.ok(store().init, "init response received");
-assert.equal(store().booting, false, "boot completes");
-assert.equal(store().page, 1, "starts on page 1");
-store().setVerifierCount(2);
-step("boot + verifier count");
+  const run = await mockApi.createRun("forgery", 200, 0.1, 1);
+  check("createRun returns a run id", run.runId.length > 0);
+  check("createRun echoes the seed", run.seed > 0);
 
-/* 2 — key generation */
-await store().startSimulation();
-assert.equal(store().section, "keygen");
-assert.ok(store().keygen?.done, "key generation completes");
-assert.equal(
-  store().keygen?.total,
-  store().keygenMeta?.totalSlots,
-  "slots come from the backend response",
-);
-step("key generation");
+  const active = await mockApi.getActive();
+  check("getActive reports the run", active.active && active.runId === run.runId);
 
-/* 3 — distribution */
-await store().toDistribute();
-assert.equal(store().section, "distribute");
-assert.ok(store().distributionDone, "distribution completes");
-assert.equal(store().distribution.length, 2, "one target per verifier");
-assert.ok(
-  store().distribution.every((v) => v.received === v.total),
-  "every verifier reaches 100%",
-);
-step("distribution to 2 verifiers");
+  console.log("\n— live simulation phases —");
+  const keygen = await mockApi.getKeygen(run.runId);
+  check("keygen reports blocks", keygen.blocks > 0);
+  check("keygen reports slots", keygen.totalSlots > 0);
 
-/* 4 — channel health */
-await store().toHealth();
-assert.ok(store().health, "health response received");
-assert.equal(store().health?.passed, true, "channel passes by default");
-assert.equal(store().maxPage, 2, "page 2 unlocked after a pass");
-step(`channel health (${store().health?.score})`);
+  const dist = await mockApi.getDistribution(run.runId);
+  check("distribution lists verifiers", dist.verifiers.length === 1);
+  check("verifier received its keys", dist.verifiers[0].received === dist.verifiers[0].total);
 
-/* 5 — sign */
-store().goToPage(2);
-assert.equal(store().page, 2, "navigates to page 2");
-store().setMessage("hello qsentinel");
-await store().signMessage();
-assert.ok(store().signature, "signature returned");
-assert.equal(store().signature?.encodedLength, 63, "63-bit encoding");
-assert.deepEqual(store().signature?.sentTo, ["Bob", "Charlie"], "sent to both verifiers");
-assert.equal(store().maxPage, 3, "page 3 unlocked");
-step("sign a message");
+  const signing = await mockApi.getSigning(run.runId);
+  check("signing returns an encoded signature", signing.encoded.length === signing.encodedLength);
+  check("signing lists recipients", signing.sentTo.length === 1);
 
-/* 6 — attack */
-store().goToPage(3);
-store().selectAttack("tampering");
-await store().launchAttack();
-assert.equal(store().attack?.attackId, "tampering");
-assert.ok(store().attack?.eve.hasNot.length, "Eve's restricted-access list present");
-assert.equal(store().maxPage, 4, "page 4 unlocked");
-step("launch attack scenario");
+  const events: string[] = [];
+  const results = await mockApi.streamVerification(run.runId, (e) => {
+    events.push(e.verifier);
+  });
+  check("verification streamed events", events.length > 0);
+  check("verification resolved results", results.length === 1);
+  check("verifier reached a verdict", results[0].verdict !== "pending");
 
-/* 7 — verification */
-await store().startVerify();
-assert.equal(store().verifyStage, "done", "verification finishes");
-assert.equal(store().verifierResults.length, 2);
-assert.equal(store().verifierResults[0]?.total, 63, "63 blocks per verifier");
-assert.ok(store().agreement, "cross-verifier agreement computed");
-assert.equal(store().blockResults.Bob?.length, 63, "block grid fully populated");
-assert.ok(
-  store().verifierResults.every((r) => r.verdict === "rejected"),
-  "tampering is rejected",
-);
-step("streaming verification");
+  console.log("\n— outcome —");
+  const result = await mockApi.getResult(run.runId);
+  check("result has a verdict", result.verdict === "accepted" || result.verdict === "rejected");
+  check("result reports a mismatch rate", result.mismatchRate >= 0);
+  check("result names a flagged-by check", result.flaggedBy.length > 0);
+  check("result lists verifier outcomes", result.verifiers.length === 1);
 
-/* 8 — dashboard */
-store().goToPage(5);
-assert.equal(store().page, 5, "dashboard reachable");
-assert.ok(store().report, "report built");
-assert.equal(store().report?.summary.attackLabel, "Signal Tampering");
-assert.equal(store().report?.fingerprint.length, 3, "three fingerprint axes");
-assert.equal(store().report?.heatmap.length, 63, "63 heatmap cells");
-assert.ok(store().logs.length > 0, "event log populated");
-step("dashboard + report");
+  const arb = await mockApi.getArbitration(run.runId);
+  check("arbitration shows two verifiers", arb.verifiers.length === 2);
+  check("arbitration has a cross-check status", arb.crossCheckStatus.length > 0);
+  check("arbitration has a ruling", arb.arbiterRuling.length > 0);
 
-/* 11 — security summary: the PS requires forgery probability analysis */
-const security = store().report?.security;
-assert.ok(security, "report carries a security summary");
-assert.equal(security!.honestAcceptanceProbability, 1, "honest acceptance is exactly 1");
-assert.equal(security!.falsePositives, 0, "no false positives");
-assert.ok(security!.trials > 0, "trials recorded");
-assert.ok(security!.claimedForgeryBound.length > 0, "a bound is claimed");
+  console.log("\n— analytics —");
+  const summary = await mockApi.getStatsSummary();
+  check("summary reports total runs", summary.totalRuns > 0);
+  check("summary reports a detection rate", summary.detectionRate > 0);
 
-const curve = store().report?.forgeryCurve;
-assert.ok(curve && curve.points.length > 1, "forgery curve has multiple points");
-const probabilities = curve!.points.map((p) => p.probability);
-assert.ok(
-  probabilities.every((p, i) => i === 0 || p <= probabilities[i - 1]),
-  "forgery probability never increases with block count",
-);
-assert.ok(Math.min(...probabilities) < 1e-6, "probability decays below 1e-6 by the final block");
-step("security summary and forgery curve are reported");
+  const byAttack = await mockApi.getByAttackType();
+  check("by-attack-type has rows", byAttack.length === 9);
+  check("every row has a detection rate", byAttack.every((r) => r.detectionRate >= 0));
 
-/* 9 — protocol page: three optional endpoints, all degraded gracefully */
-store().goToPage(5);
-assert.equal(store().page, 5, "report page reachable once verification finished");
-assert.equal(store().maxPage, 5, "maxPage advances to the report");
+  const hist = await mockApi.getHistogram();
+  check("histogram has bins", hist.bins.length > 0);
+  check("histogram has honest + attacked series", hist.honest.length === hist.bins.length);
 
-await store().loadProtocol();
-const proto = store().protocol;
-assert.equal(store().protocolStage, "done", "protocol load completed");
-assert.equal(store().maxPage, 6, "protocol page unlocks the last step");
-assert.ok(proto.bell, "bell state provided");
-assert.equal(proto.bell!.amplitudes.length, 4, "bell state has four basis amplitudes");
-assert.ok(
-  Math.abs(proto.bell!.amplitudes.reduce((sum, a) => sum + a.probability, 0) - 1) < 0.01,
-  "amplitudes sum to ~1",
-);
-assert.ok(proto.teleport, "teleport trace provided");
-assert.ok(proto.teleport!.steps.length >= 5, "teleport trace has the full step sequence");
-assert.ok(
-  proto.teleport!.steps.some((s) => s.correction !== "I"),
-  "a non-identity Pauli correction is shown",
-);
-assert.ok(proto.measurements.length >= 2, "measurement series provided");
-assert.ok(
-  proto.measurements.every((m) => m.bins.length === m.expected.length),
-  "every measurement bin has an expected count",
-);
-assert.ok(
-  new Set(proto.measurements.map((m) => m.basis)).size >= 2,
-  "measurement series cover more than one basis",
-);
-assert.ok(
-  proto.measurements.every((m) => m.verdict === "match" || m.verdict === "deviant"),
-  "every measurement series carries a verdict",
-);
-assert.equal(proto.provided.bell && proto.provided.teleport && proto.provided.measurements, true);
-step("protocol primitives load from the optional endpoints");
+  const forgery = await mockApi.getForgeryComparison();
+  check("forgery comparison has both values", forgery.classical > 0 && forgery.quantum >= 0);
 
+  console.log("\n— event log —");
+  const log = await mockApi.getLog(1, "all");
+  check("log returns entries", log.entries.length > 0);
+  check("log entries have a verdict", log.entries.every((e) => e.verdict.length > 0));
+  const filtered = await mockApi.getLog(1, "forgery");
+  check("log filters by attack type", filtered.entries.every((e) => e.attackType === "forgery"));
 
+  const csv = await mockApi.exportLog("all");
+  check("log export returns a blob", csv.size > 0);
 
-/* 10 — locked navigation is enforced */
-store().restart();
-assert.equal(store().page, 1, "restart returns to page 1");
-store().goToPage(4);
-assert.equal(store().page, 1, "cannot skip ahead after restart");
-step("navigation locking");
+  console.log("\n— error normalisation —");
+  const codes = [
+    "NETWORK",
+    "TIMEOUT",
+    "ABORTED",
+    "RUN_NOT_FOUND",
+    "INVALID_STATE",
+    "CHANNEL_UNTRUSTED",
+    "BACKEND_ERROR",
+  ] as const;
+  for (const code of codes) {
+    const err = new ApiError(code, `test ${code}`);
+    check(`ApiError(${code}) carries its code`, err.code === code);
+  }
+  check("unknown run id throws RUN_NOT_FOUND", await mockApi.getResult("run-nope").then(
+    () => false,
+    (e) => e instanceof ApiError && e.code === "RUN_NOT_FOUND",
+  ));
 
-/* 11 — failed channel blocks the flow */
-store().setForceChannelFail(true);
-await store().startSimulation();
-await store().toDistribute();
-await store().toHealth();
-assert.equal(store().health?.passed, false, "channel fails when forced");
-assert.equal(store().maxPage, 1, "page 2 stays locked on a failed channel");
-assert.equal(store().page, 1, "user cannot advance past a failed channel");
-step("failed channel halts the flow");
+  console.log(`\n${passed} passed, ${failed} failed\n`);
+  if (failed > 0) process.exit(1);
+}
 
-console.log("\nAll flow assertions passed.");
-console.log("\nAll flow assertions passed.");
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

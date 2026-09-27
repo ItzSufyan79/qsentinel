@@ -13,8 +13,13 @@
     "audit": "tsx scripts/audit.ts"
   },
   "dependencies": {
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@fontsource/ibm-plex-sans-condensed": "^5.3.0",
+    "@tabler/icons-react": "^3.48.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.4",
     "zustand": "^5.0.15"
   },
   "devDependencies": {

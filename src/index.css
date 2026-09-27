@@ -3,72 +3,76 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ==================================================================
-   QSentinel — "measurement instrument" design language
+   QSentinel — design system
+   Source: UI/UX design report, PS 26141 (Egreen Quanta).
 
-   Palette source: provided spec sheet (Material-style light scheme).
-   Semantic state colours are locked app-wide:
-   teal = pass · red = fail · amber = warning · grey = pending
+   Four colours, fixed roles — a fifth is never introduced:
+     violet  #5B3FA0  "the system is acting"
+     teal    #0F8577  "this passed"
+     red     #C23B3B  "this failed"  — never decorative
+     slate   #2A2E37 / #F4F5F7  surfaces, borders, body text
+
+   Type: IBM Plex. Scale 28 / 20 / 16 / 14 / 13 / 12. Never below 12px.
    ================================================================== */
 
 :root {
   color-scheme: light;
 
-  /* 1–4 brand */
-  --qs-primary: #6200ee;
-  --qs-primary-variant: #3700b3;
-  --qs-secondary: #03dac6;
-  --qs-secondary-variant: #018786;
+  /* brand — the four locked roles.
+     The spec's #0F8577 clears AA on white (4.53:1) but not on the spec's own
+     #F4F5F7 surface (4.15:1), so the teal is deepened just enough to pass. */
+  --qs-primary: #5b3fa0;
+  --qs-secondary: #0c7a6c;
+  --qs-fail: #c23b3b;
 
-  /* brand hue as *foreground* — dark needs a lighter tint to clear AA */
+  /* brand hue as foreground — dark needs a lighter tint to clear AA */
   --qs-accent-ink: var(--qs-primary);
-  /* pass green is dark in light mode and light in dark mode, so its
-     foreground has to flip with it */
+  /* pass green flips light/dark, so its foreground flips with it */
   --qs-on-pass: #ffffff;
 
-  /* 5–7 surfaces + error */
+  /* surfaces */
   --qs-bg: #ffffff;
-  --qs-surface: #ffffff;
-  --qs-surface-2: #f7f5fd;
-  --qs-error: #b00020;
+  --qs-surface: #f4f5f7;
+  --qs-surface-2: #e9eaee;
 
-  /* 8–12 content on top of the above */
+  /* content on top of the above */
+  --qs-on-bg: #2a2e37;
+  --qs-on-surface: #2a2e37;
   --qs-on-primary: #ffffff;
-  --qs-on-secondary: #000000;
-  --qs-on-bg: #16121f;
-  --qs-on-surface: #16121f;
+  --qs-on-secondary: #ffffff;
   --qs-on-error: #ffffff;
 
-  /* neutral ramp (purple-tinted so it sits with the brand) */
-  --qs-n-50: #fbfaff;
-  --qs-n-100: #f4f2fb;
-  --qs-n-200: #eae6f6;
-  --qs-n-300: #dcd6ee;
-  --qs-n-400: #b7aed4;
-  --qs-n-500: #736895;
-  --qs-n-600: #645a7a;
-  --qs-n-700: #4a425e;
-  --qs-n-800: #2f2940;
-  --qs-n-900: #1d1830;
+  /* neutral slate ramp */
+  --qs-n-50: #f8fafc;
+  --qs-n-100: #f1f5f9;
+  --qs-n-200: #e2e8f0;
+  --qs-n-300: #cbd5e1;
+  --qs-n-400: #94a3b8;
+  --qs-n-500: #64748b;
+  --qs-n-600: #475569;
+  --qs-n-700: #334155;
+  --qs-n-800: #1e293b;
+  --qs-n-900: #0f172a;
 
-  --qs-outline: #e4dff2;
-  --qs-outline-strong: #c6bde0;
+  --qs-outline: #e2e8f0;
+  --qs-outline-strong: #cbd5e1;
 
-  /* ink — the near-black used for primary actions and data */
-  --qs-ink: #16121f;
-  --qs-ink-soft: #2a2438;
+  /* ink — near-black used for primary actions and data */
+  --qs-ink: #0f172a;
+  --qs-ink-soft: #1e293b;
 
   /* geometry: near-square, instrument-like */
-  --qs-r: 2px;
-  --qs-r-sm: 1px;
+  --qs-r: 3px;
+  --qs-r-sm: 2px;
 
   /* semantic state — never reused for anything else */
-  --qs-pass: #01716f;
+  --qs-pass: #0c7a6c;
   --qs-pass-tint: color-mix(in oklab, var(--qs-pass) 10%, transparent);
-  --qs-fail: #b00020;
+  --qs-fail: #c23b3b;
   --qs-fail-tint: color-mix(in oklab, var(--qs-fail) 8%, transparent);
-  --qs-warn: #9a5400;
+  --qs-warn: #b45309;
   --qs-warn-tint: color-mix(in oklab, var(--qs-warn) 12%, transparent);
-  --qs-pending: #736895;
+  --qs-pending: #64748b;
   --qs-pending-tint: color-mix(in oklab, var(--qs-pending) 12%, transparent);
 
   /* motion — scaled globally by the fast-forward control */
@@ -85,54 +89,55 @@
 .dark {
   color-scheme: dark;
 
-  --qs-bg: #100e18;
-  --qs-surface: #17141f;
-  --qs-surface-2: #1d1927;
-  --qs-on-bg: #f2effc;
-  --qs-on-surface: #f2effc;
+  --qs-bg: #0f172a;
+  --qs-surface: #1e293b;
+  --qs-surface-2: #334155;
+  --qs-on-bg: #f1f5f9;
+  --qs-on-surface: #f1f5f9;
 
-  --qs-n-50: #17141f;
-  --qs-n-100: #1d1927;
-  --qs-n-200: #272132;
-  --qs-n-300: #352d45;
-  --qs-n-400: #574d72;
-  --qs-n-500: #8b809f;
-  --qs-n-600: #a99fc4;
-  --qs-n-700: #cdc5e4;
-  --qs-n-800: #e6e1f4;
-  --qs-n-900: #f2effc;
+  --qs-n-50: #0f172a;
+  --qs-n-100: #1e293b;
+  --qs-n-200: #334155;
+  --qs-n-300: #475569;
+  --qs-n-400: #64748b;
+  --qs-n-500: #94a3b8;
+  --qs-n-600: #cbd5e1;
+  --qs-n-700: #e2e8f0;
+  --qs-n-800: #f1f5f9;
+  --qs-n-900: #f8fafc;
 
-  --qs-accent-ink: #a78bff;
-  --qs-on-pass: #0b2b28;
+  --qs-accent-ink: #a78bfa;
+  --qs-on-pass: #04211d;
 
-  --qs-outline: #2b2540;
-  --qs-outline-strong: #3f375c;
-  --qs-ink: #f2effc;
-  --qs-ink-soft: #e6e1f4;
+  --qs-outline: #334155;
+  --qs-outline-strong: #475569;
+  --qs-ink: #f8fafc;
+  --qs-ink-soft: #f1f5f9;
 
-  --qs-pass: #17c8ad;
-  --qs-fail: #ff5f74;
-  --qs-warn: #f0a83c;
-  --qs-pending: #8b809f;
+  --qs-primary: #a78bfa;
+  --qs-secondary: #2dd4bf;
+  --qs-fail: #f87171;
 
-  --qs-primary-variant: #7a3ff0;
+  /* primary is a light violet in dark mode, so its foreground flips dark */
+  --qs-on-primary: #241f3a;
+
+  --qs-pass: #2dd4bf;
+  --qs-warn: #fbbf24;
+  --qs-pending: #94a3b8;
 }
 
 @theme inline {
   --color-primary: var(--qs-primary);
-  --color-primary-variant: var(--qs-primary-variant);
   --color-secondary: var(--qs-secondary);
-  --color-secondary-variant: var(--qs-secondary-variant);
   --color-accent-ink: var(--qs-accent-ink);
 
   --color-bg: var(--qs-bg);
   --color-surface: var(--qs-surface);
   --color-surface-2: var(--qs-surface-2);
-  --color-error: var(--qs-error);
-  --color-on-primary: var(--qs-on-primary);
-  --color-on-secondary: var(--qs-on-secondary);
   --color-on-bg: var(--qs-on-bg);
   --color-on-surface: var(--qs-on-surface);
+  --color-on-primary: var(--qs-on-primary);
+  --color-on-secondary: var(--qs-on-secondary);
   --color-on-error: var(--qs-on-error);
 
   --color-n-50: var(--qs-n-50);
@@ -155,12 +160,10 @@
   --color-warn: var(--qs-warn);
   --color-pending: var(--qs-pending);
 
-  --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
-    Arial, sans-serif;
-  --font-mono:
-    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
-    monospace;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-condensed: "IBM Plex Sans Condensed", "IBM Plex Sans", ui-sans-serif,
+    sans-serif;
 
   --ease-flow: var(--ease-out);
 }
@@ -178,17 +181,18 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    font-size: 15px;
+    font-size: 16px;
+    line-height: 1.5;
   }
 
   ::selection {
-    background: color-mix(in oklab, var(--qs-primary) 20%, transparent);
+    background: color-mix(in oklab, var(--qs-primary) 22%, transparent);
   }
 
   :focus-visible {
     outline: 2px solid var(--qs-primary);
     outline-offset: 2px;
-    border-radius: var(--qs-r);
+    border-radius: var(--qs-r-sm);
   }
 
   * {
@@ -212,11 +216,11 @@
   .card::after {
     content: "";
     position: absolute;
-    width: 7px;
-    height: 7px;
+    width: 8px;
+    height: 8px;
     pointer-events: none;
     border-color: var(--qs-primary);
-    opacity: 0.55;
+    opacity: 0.5;
   }
 
   .card::before {
@@ -251,13 +255,14 @@
     border-bottom: 1px solid var(--qs-outline);
   }
 
-  /* ---------- micro typography ------------------------------------ */
+  /* ---------- typography ------------------------------------------ */
 
+  /* 12px floor — the spec forbids anything smaller */
   .micro {
     font-family: var(--font-mono);
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.14em;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--qs-n-500);
   }
@@ -265,6 +270,10 @@
   .num {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
+  }
+
+  .condensed {
+    font-family: var(--font-condensed);
   }
 
   .section-band {
@@ -280,12 +289,12 @@
   .section-band .idx {
     display: grid;
     place-items: center;
-    width: 1.35rem;
-    height: 1.35rem;
+    width: 1.5rem;
+    height: 1.5rem;
     flex: none;
     font-family: var(--font-mono);
-    font-size: 10px;
-    font-weight: 700;
+    font-size: 12px;
+    font-weight: 600;
     color: var(--qs-on-primary);
     background: var(--qs-ink);
     border-radius: var(--qs-r-sm);
@@ -302,14 +311,14 @@
 
   .section-band[data-state="pending"] .idx {
     background: var(--qs-n-300);
-    color: var(--qs-n-600);
+    color: var(--qs-n-700);
   }
 
   .section-band .band-title {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.12em;
+    font-family: var(--font-condensed);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--qs-on-bg);
   }
@@ -317,8 +326,8 @@
   .section-band .band-state {
     margin-left: auto;
     font-family: var(--font-mono);
-    font-size: 10px;
-    letter-spacing: 0.12em;
+    font-size: 12px;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
   }
 
@@ -330,11 +339,11 @@
     gap: 0.35rem;
     border: 1px solid currentColor;
     border-radius: var(--qs-r-sm);
-    padding: 0.1rem 0.4rem;
-    font-family: var(--font-mono);
-    font-size: 9.5px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
+    padding: 0.15rem 0.5rem;
+    font-family: var(--font-condensed);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
     line-height: 1.5;
   }
@@ -344,7 +353,7 @@
   .chip-warn { color: var(--qs-warn); background: var(--qs-warn-tint); }
   .chip-pending { color: var(--qs-pending); background: var(--qs-pending-tint); }
   .chip-neutral { color: var(--qs-n-600); background: var(--qs-surface-2); }
-  .chip-brand { color: var(--qs-primary); background: color-mix(in oklab, var(--qs-primary) 8%, transparent); }
+  .chip-brand { color: var(--qs-primary); background: color-mix(in oklab, var(--qs-primary) 10%, transparent); }
 
   /* ---------- buttons --------------------------------------------- */
 
@@ -355,11 +364,11 @@
     gap: 0.5rem;
     border: 1px solid transparent;
     border-radius: var(--qs-r);
-    padding: 0.6rem 0.95rem;
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
+    padding: 0.65rem 1rem;
+    font-family: var(--font-condensed);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
     cursor: pointer;
     transition:
@@ -379,18 +388,17 @@
   }
 
   .btn:disabled {
-    opacity: 0.3;
+    opacity: 0.35;
     cursor: not-allowed;
   }
 
   .btn-primary {
-    background: var(--qs-ink);
-    color: var(--qs-bg);
+    background: var(--qs-primary);
+    color: var(--qs-on-primary);
   }
 
   .btn-primary:hover:not(:disabled) {
-    background: var(--qs-primary);
-    color: var(--qs-on-primary);
+    background: var(--qs-accent-ink);
   }
 
   .btn-secondary {
@@ -419,13 +427,9 @@
     color: var(--qs-on-error);
   }
 
-  .btn-danger:hover:not(:disabled) {
-    background: var(--qs-error);
-  }
-
   .btn-sm {
-    padding: 0.42rem 0.7rem;
-    font-size: 10px;
+    padding: 0.45rem 0.75rem;
+    font-size: 12px;
   }
 
   /* ---------- data bars ------------------------------------------- */
@@ -455,11 +459,11 @@
   }
 
   .stamp-label {
-    font-family: var(--font-mono);
-    font-size: clamp(1rem, 3.2vw, 1.4rem);
-    font-weight: 700;
-    letter-spacing: 0.16em;
-    line-height: 1;
+    font-family: var(--font-condensed);
+    font-size: clamp(1.1rem, 3.2vw, 1.5rem);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    line-height: 1.1;
   }
 
   /* ---------- loading --------------------------------------------- */
@@ -488,14 +492,14 @@
   }
 
   .caption-text {
-    font-size: 13.5px;
-    line-height: 1.65;
+    font-size: 14px;
+    line-height: 1.6;
     color: var(--qs-n-600);
     max-width: 70ch;
   }
 
   .dark .caption-text {
-    color: var(--qs-n-700);
+    color: var(--qs-n-500);
   }
 
   /* blueprint canvas grid */
@@ -556,169 +560,78 @@
 /* ------------------------------------------------------------------ */
 
 @keyframes qs-hatch {
-  from {
-    transform: translate(0, 0);
-  }
-  to {
-    transform: translate(-9px, 9px);
-  }
+  from { transform: translate(0, 0); }
+  to { transform: translate(-9px, 9px); }
 }
 
 @keyframes qs-fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes qs-pop {
-  from {
-    opacity: 0;
-    transform: scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+  from { opacity: 0; transform: scale(0.985); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 @keyframes qs-tick {
-  0% {
-    transform: scale(0.7);
-    opacity: 0;
-  }
-  60% {
-    transform: scale(1.1);
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
+  0% { transform: scale(0.7); opacity: 0; }
+  60% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 @keyframes qs-shake {
-  10%,
-  90% {
-    transform: translateX(-2px);
-  }
-  20%,
-  80% {
-    transform: translateX(4px);
-  }
-  30%,
-  50%,
-  70% {
-    transform: translateX(-6px);
-  }
-  40%,
-  60% {
-    transform: translateX(6px);
-  }
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(4px); }
+  30%, 50%, 70% { transform: translateX(-6px); }
+  40%, 60% { transform: translateX(6px); }
 }
 
 @keyframes qs-pulse-soft {
-  0%,
-  100% {
-    opacity: 0.45;
-  }
-  50% {
-    opacity: 1;
-  }
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
 }
 
 @keyframes qs-scan {
-  from {
-    left: -12%;
-  }
-  to {
-    left: 108%;
-  }
+  from { left: -12%; }
+  to { left: 108%; }
 }
 
-/* gauge needle while the backend is still measuring */
 @keyframes qs-seek {
-  0% {
-    transform: rotate(6deg);
-  }
-  45% {
-    transform: rotate(174deg);
-  }
-  100% {
-    transform: rotate(6deg);
-  }
+  0% { transform: rotate(6deg); }
+  45% { transform: rotate(174deg); }
+  100% { transform: rotate(6deg); }
 }
 
-/* packet on the wire — travel and colour are separate animations so they
-   share one timing function and stay in sync */
 @keyframes qs-travel {
-  from {
-    transform: translate(0, -50%);
-  }
-  to {
-    transform: translate(var(--wire-len, 240px), -50%);
-  }
+  from { transform: translate(0, -50%); }
+  to { transform: translate(var(--wire-len, 240px), -50%); }
 }
 
 @keyframes qs-recolor-idle {
-  0%,
-  100% {
-    background: var(--qs-primary);
-  }
+  0%, 100% { background: var(--qs-primary); }
 }
 
 @keyframes qs-recolor-alter {
-  0%,
-  46% {
-    background: var(--qs-primary);
-  }
-  54%,
-  100% {
-    background: var(--qs-fail);
-  }
+  0%, 46% { background: var(--qs-primary); }
+  54%, 100% { background: var(--qs-fail); }
 }
 
 @keyframes qs-recolor-grab {
-  0% {
-    background: var(--qs-primary);
-    opacity: 1;
-  }
-  45% {
-    opacity: 1;
-  }
-  49% {
-    opacity: 0;
-  }
-  53%,
-  100% {
-    opacity: 1;
-    background: var(--qs-secondary-variant);
-  }
+  0% { background: var(--qs-primary); opacity: 1; }
+  45% { opacity: 1; }
+  49% { opacity: 0; }
+  53%, 100% { opacity: 1; background: var(--qs-secondary); }
 }
 
 @keyframes qs-recolor-swap {
-  0%,
-  46% {
-    background: var(--qs-primary);
-  }
-  54%,
-  100% {
-    background: var(--qs-fail);
-  }
+  0%, 46% { background: var(--qs-primary); }
+  54%, 100% { background: var(--qs-fail); }
 }
 
 @keyframes qs-recolor-reuse {
-  0%,
-  46% {
-    background: var(--qs-n-400);
-  }
-  54%,
-  100% {
-    background: var(--qs-warn);
-  }
+  0%, 46% { background: var(--qs-n-400); }
+  54%, 100% { background: var(--qs-warn); }
 }
 
 /* ------------------------------------------------------------------ */

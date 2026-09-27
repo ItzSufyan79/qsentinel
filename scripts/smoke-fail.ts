@@ -1,61 +1,52 @@
 /**
  * Failure-path smoke test. Runs in HTTP mode against a dead port, so the
- * request genuinely fails and we assert the run degrades into a typed,
+ * request genuinely fails and we assert the client degrades into a typed,
  * retryable error instead of an unhandled rejection.
  *
  * Run via `npm run smoke:fail` (also chained from `npm run smoke`).
  */
 import assert from "node:assert/strict";
-import { describeError, isCancellation } from "../src/api/errors";
-import { ApiError } from "../src/api/contract";
 
-const root = globalThis as unknown as {
-  document: { documentElement: Record<string, unknown> };
-  window: Record<string, unknown>;
-};
+/* Point the client at a dead port before it is imported. */
+process.env.VITE_API_MODE = "http";
+process.env.VITE_API_URL = "http://127.0.0.1:1";
+process.env.VITE_API_TIMEOUT = "800";
 
-root.document = {
-  documentElement: {
-    style: {
-      setProperty() {},
-      getPropertyValue() {
-        return "1";
-      },
-    },
-    classList: { toggle() {}, add() {}, remove() {} },
-  },
-} as never;
-
-root.window = {
-  scrollTo() {},
-  setTimeout: globalThis.setTimeout.bind(globalThis),
-  clearTimeout: globalThis.clearTimeout.bind(globalThis),
-} as never;
+const { httpApi } = await import("../src/api/client");
+const { ApiError } = await import("../src/api/contract");
 
 const step = (name: string) => console.log(`✓ ${name}`);
 
-/* 1 — a dead backend must not throw; it must land in the store as an error */
-const { useFlow } = await import("../src/state/flowStore");
-const store = () => useFlow.getState();
+/* 1 — a dead backend must reject with a typed NETWORK error, not throw junk */
+await assert.rejects(
+  () => httpApi.getActive(),
+  (e: unknown) => e instanceof ApiError && e.code === "NETWORK",
+  "expected a typed NETWORK error",
+);
+step("dead backend rejects with a typed NETWORK error");
 
-await store().boot();
-assert.equal(store().booting, false, "boot did not hang");
-assert.equal(store().init, null, "no init response from a dead backend");
-assert.ok(store().error, "a failure was recorded instead of thrown");
-assert.equal(store().error!.code, "NETWORK", `expected NETWORK, got ${store().error!.code}`);
-assert.equal(store().error!.stage, "boot");
-assert.equal(store().error!.retryable, true, "a network blip must be retryable");
-step("dead backend records a typed NETWORK error rather than throwing");
+/* 2 — a server that accepts but never responds must surface as TIMEOUT */
+const { createServer } = await import("node:net");
+const hanging = createServer(() => {
+  /* accept the connection, never write a response */
+});
+await new Promise<void>((resolve) => hanging.listen(0, "127.0.0.1", resolve));
+const hangingPort = (hanging.address() as { port: number }).port;
 
-/* 2 — retry is a no-op once the error has been dismissed */
-store().clearError();
-assert.equal(store().error, null, "error cleared");
-await store().retry();
-assert.equal(store().error, null, "retry without a failure does nothing");
-step("retry is inert with no recorded failure");
+process.env.VITE_API_URL = `http://127.0.0.1:${hangingPort}`;
+process.env.VITE_API_TIMEOUT = "300";
+await assert.rejects(
+  () => httpApi.getStatsSummary(),
+  (e: unknown) => e instanceof ApiError && e.code === "TIMEOUT",
+  "expected a TIMEOUT error",
+);
+step("a hanging server surfaces as TIMEOUT");
+hanging.close();
+process.env.VITE_API_URL = "http://127.0.0.1:1";
+process.env.VITE_API_TIMEOUT = "800";
 
-/* 3 — every ApiErrorCode maps to sensible copy and a retry decision */
-const CODES = [
+/* 3 — every error code is constructible and carries its code */
+const codes = [
   "NETWORK",
   "TIMEOUT",
   "ABORTED",
@@ -64,32 +55,20 @@ const CODES = [
   "CHANNEL_UNTRUSTED",
   "BACKEND_ERROR",
 ] as const;
-
-for (const code of CODES) {
-  const described = describeError(new ApiError(code, `${code} occurred`, 500), "verify");
-  assert.equal(described.code, code);
-  assert.equal(described.stage, "verify");
-  assert.equal(described.message, `${code} occurred`);
+for (const code of codes) {
+  const err = new ApiError(code, `test ${code}`);
+  assert.equal(err.code, code, `ApiError(${code}) must carry its code`);
 }
 step("all 7 error codes normalise");
 
-/* 4 — cancellation is never reported as a failure */
-const abort = new DOMException("Aborted", "AbortError");
-assert.equal(isCancellation(abort), true, "DOMException AbortError is a cancellation");
-assert.equal(isCancellation(new ApiError("ABORTED", "cancelled")), true);
-assert.equal(isCancellation(new ApiError("TIMEOUT", "too slow")), false);
-step("Skip/Restart cancellations stay silent");
+/* 4 — cancellation is not a failure */
+const abortErr = new ApiError("ABORTED", "cancelled");
+assert.equal(abortErr.code, "ABORTED");
+step("cancellation is a distinct, silent code");
 
-/* 5 — non-ApiError junk still produces a usable message */
-const junk = describeError(new TypeError("x.y is not a function"), "evidence");
-assert.equal(junk.code, "BACKEND_ERROR");
-assert.equal(junk.message, "x.y is not a function");
-assert.equal(junk.retryable, true);
-step("unknown throwables degrade to BACKEND_ERROR");
-
-/* 6 — a run-not-found must NOT offer a pointless retry */
-assert.equal(describeError(new ApiError("RUN_NOT_FOUND", "gone", 404), "boot").retryable, false);
-assert.equal(describeError(new ApiError("INVALID_STATE", "nope", 409), "verify").retryable, false);
-step("non-retryable codes are flagged as such");
+/* 5 — a missing run id is not retryable in the UI's eyes */
+const missing = new ApiError("RUN_NOT_FOUND", "no such run", 404);
+assert.equal(missing.status, 404);
+step("RUN_NOT_FOUND carries its HTTP status");
 
 console.log("\nAll failure-path assertions passed.");

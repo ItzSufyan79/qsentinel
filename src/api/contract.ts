@@ -1,59 +1,41 @@
 /**
  * QSentinel backend contract — SIH PS 26141.
  *
- * This file is the hand-off point between the frontend and the quantum team.
- * Nothing in `src/components` or `src/pages` talks to the network directly:
- * they consume `api` from `src/api/index.ts`, which is typed as `QdsApi`.
+ * Contract source: UI/UX design report, section 6. `client.ts` calls exactly
+ * these routes; change one here and nothing else moves.
  *
- * Implement the twelve methods below and the frontend works, unchanged.
+ * Nothing in `src/components` or `src/pages` talks to the network directly —
+ * they consume `api` from `src/api/index.ts`, typed as `QdsApi`.
  *
- * ------------------------------------------------------------------
- * HARD RULE (from the problem statement)
- * ------------------------------------------------------------------
- * The frontend never computes a threshold, a count, a percentage, a
- * probability or a verdict. Every number the UI displays arrives in one of
- * these shapes. If a value is missing from a response, it does not exist in
- * the product — do not derive it in React.
- *
- * ------------------------------------------------------------------
- * RULES
- * ------------------------------------------------------------------
- * 1. Every response is JSON and matches `src/api/types.ts` exactly.
- * 2. `seed` is authoritative. Same seed + same inputs => byte-identical run.
- *    The frontend exposes the seed in the URL so any run is reproducible.
- * 3. Long work is streamed (SSE), never polled. The demo runs live.
- * 4. Failures use the `ApiError` shape with a real `code`, so the UI can show
- *    a specific message instead of "something went wrong".
- * 5. All values are finite numbers. No `NaN`, no `null` in place of a number.
- *
- * ------------------------------------------------------------------
- * THE THREE NUMBERS TO PROVE
- * ------------------------------------------------------------------
- * Judges will ask for these. They belong in `DashboardReport.security`:
- *   - legitimate signature accepted with probability 1 (deterministic)
- *   - forgery probability at or below the declared bound
- *   - zero false positives across the honest baseline runs
+ * HARD RULE (from the problem statement): the frontend never computes a
+ * threshold, a count, a percentage, a probability or a verdict. Every number
+ * the UI displays arrives in one of these shapes.
  */
 
 import type {
-  BellStateResponse,
-  MeasurementSeries,
-  TeleportTrace,
-  Agreement,
-  AttackId,
-  AttackResponse,
-  BlockResult,
-  ChannelHealthResponse,
-  DashboardReport,
-  DistributeResponse,
+  ActiveResponse,
+  ApiErrorCode,
+  ArbitrationResponse,
+  AttackTypeId,
+  ByAttackTypeRow,
+  DistributionResponse,
+  ForgeryComparison,
+  HistogramResponse,
   InitResponse,
   KeygenResponse,
-  LogEntry,
+  LogPage,
+  PreviewResponse,
+  ResultResponse,
+  RunResponse,
   SignResponse,
-  VerifierResult,
-  VerifierTarget,
+  StatsSummary,
   VerifyEvent,
+  VerifierResult,
 } from "./types";
+import { ApiError } from "./types";
+
+export { ApiError };
+export type { ApiErrorCode };
 
 /** Per-call cancellation + demo speed, threaded from the store. */
 export interface RunContext {
@@ -65,234 +47,101 @@ export interface RunContext {
   forceFail?: boolean;
 }
 
-export interface PlannedBlock {
-  verifier: string;
-  block: BlockResult;
-}
-
-export interface VerificationPlan {
-  plan: PlannedBlock[];
-  results: VerifierResult[];
-}
-
-/** Machine-readable failure reasons. The UI switches on `code`. */
-export type ApiErrorCode =
-  | "NETWORK"
-  | "TIMEOUT"
-  | "ABORTED"
-  | "RUN_NOT_FOUND"
-  | "INVALID_STATE"
-  | "CHANNEL_UNTRUSTED"
-  | "BACKEND_ERROR";
-
-export class ApiError extends Error {
-  readonly code: ApiErrorCode;
-  readonly status: number;
-  readonly detail?: string;
-
-  constructor(code: ApiErrorCode, message: string, status = 0, detail?: string) {
-    super(message);
-    this.name = "ApiError";
-    this.code = code;
-    this.status = status;
-    this.detail = detail;
-  }
-}
-
 export interface QdsApi {
-  /* ---- 1. run bootstrap ------------------------------------------- */
+  /* ---- run lifecycle --------------------------------------------- */
 
-  /** Create or resume a run. `seed` may be omitted for a fresh random run. */
-  init(seed?: number, ctx?: RunContext): Promise<InitResponse>;
+  /** GET /api/simulate/active — polled by the global nav badge. */
+  getActive(ctx?: RunContext): Promise<ActiveResponse>;
 
-  /* ---- 2. key generation (deliverable 1) -------------------------- */
-
-  /** Shape of the key pool. The filling animation is driven by `streamKeygen`. */
-  keygen(runId: string, ctx?: RunContext): Promise<KeygenResponse>;
-
-  /** Progress ticks for the key pool. `keygen()` returns when this ends. */
-  streamKeygen(
-    runId: string,
-    onProgress: (created: number, total: number, done: boolean) => void,
+  /** GET /api/simulate/preview — predicted confidence at a given N. */
+  preview(
+    attack: AttackTypeId,
+    n: number,
+    threshold: number,
     ctx?: RunContext,
-  ): Promise<void>;
+  ): Promise<PreviewResponse>;
 
-  /* ---- 3. distribution -------------------------------------------- */
-
-  distribute(
-    runId: string,
+  /** POST /api/simulate/run — create a run, returns its id. */
+  createRun(
+    attack: AttackTypeId,
+    n: number,
+    threshold: number,
     verifierCount: number,
     ctx?: RunContext,
-  ): Promise<DistributeResponse>;
+  ): Promise<RunResponse>;
 
-  /** Per-verifier receipt ticks. Resolves once every verifier is complete. */
-  streamDistribution(
-    runId: string,
-    verifiers: string[],
-    onProgress: (received: VerifierTarget[]) => void,
-    ctx?: RunContext,
-  ): Promise<void>;
+  /* ---- live simulation phases ------------------------------------ */
 
-  /* ---- 4. channel health ------------------------------------------ */
+  /** GET /api/simulate/{run_id}/keygen */
+  getKeygen(runId: string, ctx?: RunContext): Promise<KeygenResponse>;
 
-  /**
-   * Score in [0, 1]. `bands` must come from the backend — the gauge reads
-   * them, it does not hard-code 0.5 / 0.8.
-   */
-  channelHealth(runId: string, ctx?: RunContext): Promise<ChannelHealthResponse>;
+  /** GET /api/simulate/{run_id}/distribution */
+  getDistribution(runId: string, ctx?: RunContext): Promise<DistributionResponse>;
 
-  /* ---- 5. signing (deliverable 3) --------------------------------- */
-
-  sign(
-    runId: string,
-    message: string,
-    verifierNames: string[],
-    ctx?: RunContext,
-  ): Promise<SignResponse>;
-
-  /* ---- 6. attack launch (deliverable 4) --------------------------- */
-
-  launchAttack(
-    runId: string,
-    attackId: AttackId,
-    intensity: number,
-    ctx?: RunContext,
-  ): Promise<AttackResponse>;
-
-  /* ---- 7. verification planning ----------------------------------- */
+  /** GET /api/simulate/{run_id}/signing */
+  getSigning(runId: string, ctx?: RunContext): Promise<SignResponse>;
 
   /**
-   * Deterministic given the seed. The whole run is planned up front so that
-   * Skip can jump to the end — do not make the plan depend on wall-clock time.
-   */
-  planVerification(
-    runId: string,
-    verifierNames: string[],
-    attackId: AttackId,
-    intensity: number,
-    seed: number,
-    ctx?: RunContext,
-  ): Promise<VerificationPlan>;
-
-  /* ---- 8. verification stream ------------------------------------- */
-
-  /**
-   * Emits one `VerifyEvent` per block, in order, then resolves.
-   * Must abort promptly on `ctx.signal`.
+   * GET /api/simulate/{run_id}/verification — streams one VerifyEvent per
+   * block, in order, then resolves. Aborts promptly on `ctx.signal`.
    */
   streamVerification(
     runId: string,
-    plan: PlannedBlock[],
-    results: VerifierResult[],
     onEvent: (event: VerifyEvent) => void,
     ctx?: RunContext,
-  ): Promise<void>;
+  ): Promise<VerifierResult[]>;
 
-  /* ---- 9. cross-verifier agreement ------------------------------- */
+  /* ---- outcome --------------------------------------------------- */
 
-  agreementFor(runId: string, results: VerifierResult[]): Promise<Agreement>;
+  /** GET /api/simulate/{run_id}/result */
+  getResult(runId: string, ctx?: RunContext): Promise<ResultResponse>;
 
-  /* ---- 10. report -------------------------------------------------- */
+  /** GET /api/simulate/{run_id}/arbitration — only meaningful when disputed. */
+  getArbitration(runId: string, ctx?: RunContext): Promise<ArbitrationResponse>;
 
-  buildReport(
-    runId: string,
-    verifierNames: string[],
-    results: VerifierResult[],
-    attack: AttackResponse,
-    channelScore: number,
-    seed: number,
-    ctx?: RunContext,
-  ): Promise<DashboardReport>;
+  /* ---- analytics ------------------------------------------------- */
 
-  buildLogs(
-    runId: string,
-    attack: AttackResponse,
-    results: VerifierResult[],
-    channelScore: number,
-    startedAt: number,
-  ): Promise<LogEntry[]>;
+  /** GET /api/stats/summary */
+  getStatsSummary(ctx?: RunContext): Promise<StatsSummary>;
 
-  /* ---- 11. evidence export ---------------------------------------- */
+  /** GET /api/stats/by-attack-type */
+  getByAttackType(ctx?: RunContext): Promise<ByAttackTypeRow[]>;
 
-  fetchEvidence(runId: string, report: DashboardReport): Promise<Blob>;
+  /** GET /api/stats/histogram */
+  getHistogram(ctx?: RunContext): Promise<HistogramResponse>;
 
-  /* ---- 13. protocol primitives (optional) ------------------------- */
-  /*
-   * These back the Protocol page. They are optional on purpose: a backend that
-   * has not built them yet still runs the full five-stage flow, and the page
-   * reports "not provided by this backend" rather than failing.
-   */
+  /** GET /api/stats/forgery-comparison */
+  getForgeryComparison(ctx?: RunContext): Promise<ForgeryComparison>;
 
-  /** Bell-state entanglement: formula, amplitudes, correlation evidence. */
-  fetchBellState?(runId: string, ctx?: RunContext): Promise<BellStateResponse>;
+  /* ---- event log ------------------------------------------------- */
 
-  /** Step-by-step teleportation, including the Pauli correction applied. */
-  fetchTeleportTrace?(runId: string, ctx?: RunContext): Promise<TeleportTrace>;
+  /** GET /api/log?page=&filter= */
+  getLog(page: number, filter: string, ctx?: RunContext): Promise<LogPage>;
 
-  /** Projective measurement distributions, per basis. */
-  fetchMeasurements?(runId: string, ctx?: RunContext): Promise<MeasurementSeries[]>;
+  /** GET /api/log/export — CSV of the current filtered view. */
+  exportLog(filter: string, ctx?: RunContext): Promise<Blob>;
 }
 
 /* ------------------------------------------------------------------ *
- * HTTP ROUTE MAP
- * ------------------------------------------------------------------ *
- * `client.ts` calls exactly these. Change a route and nothing else moves.
- *
- *   POST   /runs                     -> InitResponse
- *   GET    /runs/:runId/keygen       -> KeygenResponse
- *   GET    /runs/:runId/keygen/stream    (SSE)  keygen progress
- *   POST   /runs/:runId/verifiers    -> DistributeResponse
- *   GET    /runs/:runId/verifiers/stream (SSE)  distribution progress
- *   GET    /runs/:runId/channel-health  -> ChannelHealthResponse
- *   POST   /runs/:runId/sign         -> SignResponse
- *   POST   /runs/:runId/attack       -> AttackResponse
- *   POST   /runs/:runId/verify/plan  -> VerificationPlan
- *   GET    /runs/:runId/verify/stream    (SSE)  VerifyEvent
- *   GET    /runs/:runId/agreement    -> Agreement
- *   GET    /runs/:runId/report       -> DashboardReport
- *   GET    /runs/:runId/logs         -> LogEntry[]
- *   GET    /runs/:runId/evidence     -> application/json
- *
- * `X-QS-Seed` header on /runs lets a shared link reproduce a run.
+ * HTTP ROUTE MAP — design report, section 6
  * ------------------------------------------------------------------ */
 
 export const ROUTES = {
-  create: "/runs",
-  keygen: (id: string) => `/runs/${id}/keygen`,
-  keygenStream: (id: string) => `/runs/${id}/keygen/stream`,
-  verifiers: (id: string) => `/runs/${id}/verifiers`,
-  verifiersStream: (id: string) => `/runs/${id}/verifiers/stream`,
-  channelHealth: (id: string) => `/runs/${id}/channel-health`,
-  sign: (id: string) => `/runs/${id}/sign`,
-  attack: (id: string) => `/runs/${id}/attack`,
-  verifyPlan: (id: string) => `/runs/${id}/verify/plan`,
-  verifyStream: (id: string) => `/runs/${id}/verify/stream`,
-  agreement: (id: string) => `/runs/${id}/agreement`,
-  report: (id: string) => `/runs/${id}/report`,
-  logs: (id: string) => `/runs/${id}/logs`,
-  evidence: (id: string) => `/runs/${id}/evidence`,
-  protocolBell: (id: string) => `/runs/${id}/protocol/bell`,
-  protocolTeleport: (id: string) => `/runs/${id}/protocol/teleport`,
-  protocolMeasure: (id: string) => `/runs/${id}/protocol/measure`,
-  protocolForgery: (id: string) => `/runs/${id}/protocol/forgery`,
+  active: "/api/simulate/active",
+  preview: "/api/simulate/preview",
+  run: "/api/simulate/run",
+  keygen: (id: string) => `/api/simulate/${id}/keygen`,
+  distribution: (id: string) => `/api/simulate/${id}/distribution`,
+  signing: (id: string) => `/api/simulate/${id}/signing`,
+  verification: (id: string) => `/api/simulate/${id}/verification`,
+  result: (id: string) => `/api/simulate/${id}/result`,
+  arbitration: (id: string) => `/api/simulate/${id}/arbitration`,
+  statsSummary: "/api/stats/summary",
+  statsByAttackType: "/api/stats/by-attack-type",
+  statsHistogram: "/api/stats/histogram",
+  statsForgeryComparison: "/api/stats/forgery-comparison",
+  log: "/api/log",
+  logExport: "/api/log/export",
 } as const;
 
-/* ------------------------------------------------------------------ *
- * EXTENSION — the Protocol page
- * ------------------------------------------------------------------ *
- * The PS names four primitives the frontend has to *show*:
- *   Bell-state entanglement · quantum teleportation
- *   Pauli correction operations · projective measurement rules
- *
- * Those are new read-only endpoints. They are additive: the five existing
- * pages work without them, and the Protocol page degrades to "not reported
- * by this backend" if they are absent.
- *
- *   GET /runs/:runId/protocol/bell       -> BellStateResponse
- *   GET /runs/:runId/protocol/teleport   -> TeleportTrace
- *   GET /runs/:runId/protocol/measure    -> MeasurementSeries[]
- *   GET /runs/:runId/protocol/forgery    -> ForgeryCurve
- *
- * Shapes live in `src/api/types.ts`. Plain numbers only — the frontend does
- * no linear algebra, it just draws them.
- */
+export type { InitResponse };
