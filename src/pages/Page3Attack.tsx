@@ -45,7 +45,7 @@ export function Page3Attack() {
                         >
                           {selected && <Icon name="check" size={10} className="text-bg" />}
                         </span>
-                        <span className="num text-[10px] font-semibold tracking-[0.1em] text-n-400">
+                        <span className="num text-[10px] font-semibold tracking-[0.1em] text-n-500">
                           {String(index + 1).padStart(2, "0")}
                         </span>
                         <span className="font-mono text-[12px] font-semibold tracking-[0.06em] text-on-bg uppercase">
@@ -72,7 +72,7 @@ export function Page3Attack() {
                           className="h-1 flex-1 accent-[var(--qs-primary)]"
                           aria-label="Attack intensity"
                         />
-                        <span className="num w-11 text-right text-[12px] font-semibold text-primary">
+                        <span className="num w-11 text-right text-[12px] font-semibold text-accent-ink">
                           {store.intensity}%
                         </span>
                       </div>

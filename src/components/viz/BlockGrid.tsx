@@ -33,7 +33,7 @@ export function BlockGrid({
         </div>
         <span className="num shrink-0 text-[11px] font-semibold text-n-500">
           <Counter value={result.checked} />
-          <span className="text-n-400">/{result.total}</span>
+          <span className="text-n-500">/{result.total}</span>
         </span>
       </header>
 
@@ -66,7 +66,7 @@ export function BlockGrid({
         <span className="micro">checked</span>
         <span className="num text-[11px] font-semibold text-on-bg">
           {result.checked}
-          <span className="text-n-400">/{result.total}</span>
+          <span className="text-n-500">/{result.total}</span>
         </span>
         <span className="micro">failed</span>
         <span

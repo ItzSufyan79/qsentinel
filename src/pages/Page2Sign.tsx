@@ -26,7 +26,7 @@ export function Page2Sign() {
               placeholder="Type your message here…"
               rows={3}
               disabled={store.signStage === "running"}
-              className="w-full resize-y border border-outline-strong bg-surface px-3.5 py-3 text-[15px] text-on-bg placeholder:text-n-400 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+              className="w-full resize-y border border-outline-strong bg-surface px-3.5 py-3 text-[15px] text-on-bg placeholder:text-n-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
             />
           </label>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
@@ -57,7 +57,7 @@ export function Page2Sign() {
         {store.signStage === "idle" && !signature && (
           <Panel muted>
             <div className="flex flex-col items-center gap-3 py-8 text-center">
-              <span className="grid size-10 place-items-center border border-dashed border-outline-strong text-n-400">
+              <span className="grid size-10 place-items-center border border-dashed border-outline-strong text-n-500">
                 <Icon name="layers" size={20} />
               </span>
               <p className="max-w-xs text-[13.5px] text-n-500">

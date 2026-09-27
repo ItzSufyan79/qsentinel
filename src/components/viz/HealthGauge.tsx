@@ -137,11 +137,11 @@ export function HealthGauge({
         <div className="flex items-baseline justify-between gap-3 border-t border-outline px-2.5 py-2">
           <span className="micro">score</span>
           {measuring || !health ? (
-            <span className="num text-[13px] font-semibold text-n-400">——</span>
+            <span className="num text-[13px] font-semibold text-n-500">——</span>
           ) : (
             <span className="num text-[17px] leading-none font-semibold" style={{ color }}>
               <Counter value={Number(score.toFixed(2))} format={(n) => n.toFixed(2)} />
-              <span className="text-[11px] text-n-400"> / 1.00</span>
+              <span className="text-[11px] text-n-500"> / 1.00</span>
             </span>
           )}
         </div>

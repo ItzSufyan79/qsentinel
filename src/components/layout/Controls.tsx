@@ -52,7 +52,7 @@ export function DemoControls() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="inline-flex items-center gap-1.5 font-mono text-[10px] font-semibold tracking-[0.1em] text-n-500 uppercase transition-colors hover:text-primary"
+        className="inline-flex items-center gap-1.5 font-mono text-[10px] font-semibold tracking-[0.1em] text-n-500 uppercase transition-colors hover:text-accent-ink"
       >
         <Icon name="zap" size={12} />
         Demo

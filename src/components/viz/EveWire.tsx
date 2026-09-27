@@ -78,7 +78,7 @@ export function EveWire({
             className={`absolute top-1/2 left-1/2 z-10 grid size-10 -translate-x-1/2 -translate-y-1/2 place-items-center border-2 transition-colors duration-300 ${
               hostile
                 ? "border-fail bg-[var(--qs-fail-tint)] text-fail animate-pulse-soft"
-                : "border-outline-strong bg-surface text-n-400"
+                : "border-outline-strong bg-surface text-n-500"
             }`}
             title={hostile ? "Eve — simulated attacker on the wire" : "No adversary on the wire"}
           >

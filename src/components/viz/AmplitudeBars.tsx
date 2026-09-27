@@ -37,7 +37,7 @@ export function AmplitudeBars({
             />
             <span className="num text-[10px] whitespace-nowrap text-on-bg">{a.label}</span>
             {showCoefficients && (
-              <span className="num text-[9px] whitespace-nowrap text-n-400">
+              <span className="num text-[9px] whitespace-nowrap text-n-500">
                 {a.im === 0
                   ? a.re.toFixed(3)
                   : `${a.re.toFixed(2)}${a.im < 0 ? "−" : "+"}${Math.abs(a.im).toFixed(2)}i`}

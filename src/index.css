@@ -19,6 +19,12 @@
   --qs-secondary: #03dac6;
   --qs-secondary-variant: #018786;
 
+  /* brand hue as *foreground* — dark needs a lighter tint to clear AA */
+  --qs-accent-ink: var(--qs-primary);
+  /* pass green is dark in light mode and light in dark mode, so its
+     foreground has to flip with it */
+  --qs-on-pass: #ffffff;
+
   /* 5–7 surfaces + error */
   --qs-bg: #ffffff;
   --qs-surface: #ffffff;
@@ -62,7 +68,7 @@
   --qs-fail-tint: color-mix(in oklab, var(--qs-fail) 8%, transparent);
   --qs-warn: #9a5400;
   --qs-warn-tint: color-mix(in oklab, var(--qs-warn) 12%, transparent);
-  --qs-pending: #8b809f;
+  --qs-pending: #736895;
   --qs-pending-tint: color-mix(in oklab, var(--qs-pending) 12%, transparent);
 
   /* motion — scaled globally by the fast-forward control */
@@ -96,6 +102,9 @@
   --qs-n-800: #e6e1f4;
   --qs-n-900: #f2effc;
 
+  --qs-accent-ink: #a78bff;
+  --qs-on-pass: #0b2b28;
+
   --qs-outline: #2b2540;
   --qs-outline-strong: #3f375c;
   --qs-ink: #f2effc;
@@ -114,6 +123,7 @@
   --color-primary-variant: var(--qs-primary-variant);
   --color-secondary: var(--qs-secondary);
   --color-secondary-variant: var(--qs-secondary-variant);
+  --color-accent-ink: var(--qs-accent-ink);
 
   --color-bg: var(--qs-bg);
   --color-surface: var(--qs-surface);
@@ -283,6 +293,7 @@
 
   .section-band[data-state="done"] .idx {
     background: var(--qs-pass);
+    color: var(--qs-on-pass);
   }
 
   .section-band[data-state="active"] .idx {

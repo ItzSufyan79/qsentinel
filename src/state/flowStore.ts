@@ -46,6 +46,11 @@ function setFastForward(on: boolean) {
   );
 }
 
+/** Dark is the default, so the class must land before the first paint. */
+function applyTheme(theme: "light" | "dark") {
+  document.documentElement.classList.toggle("dark", theme === "dark");
+}
+
 /** `?seed=…` in the URL makes any run reproducible from a shared link. */
 function seedFromUrl(): number | undefined {
   const search = window.location?.search;
@@ -161,7 +166,7 @@ const initial: FlowState = {
   booting: true,
   init: null,
   explainMode: "simple",
-  theme: "light",
+  theme: "dark",
   running: false,
   fastForward: false,
   forceChannelFail: false,
@@ -272,7 +277,7 @@ export const useFlow = create<FlowStore>((set, get) => {
 
     toggleTheme: () => {
       const theme = get().theme === "light" ? "dark" : "light";
-      document.documentElement.classList.toggle("dark", theme === "dark");
+      applyTheme(theme);
       set({ theme });
     },
 
@@ -685,8 +690,11 @@ export const useFlow = create<FlowStore>((set, get) => {
         attackId,
         intensity,
       });
-      document.documentElement.classList.toggle("dark", theme === "dark");
+      applyTheme(theme);
       window.scrollTo({ top: 0, behavior: "smooth" });
     },
   };
 });
+
+// Runs at import time, before React paints, so there is no light flash.
+applyTheme(useFlow.getState().theme);

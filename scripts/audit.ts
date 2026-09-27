@@ -20,6 +20,9 @@ const OUT_DIR = join(process.cwd(), ".audit");
 
 /** Drive the flow by clicking through primary actions and fast-forwarding. */
 const DEEP = process.argv.includes("--deep");
+/** Dark is the shipped default, so it has to be measurable too. */
+const THEME = process.argv.includes("--dark") ? "dark" : "light";
+const SET_THEME = `document.documentElement.classList.toggle("dark", ${JSON.stringify(THEME)} === "dark"); ${THEME}`;
 
 /** Which page the app is on, read from the stepper's aria-current. */
 const CURRENT_PAGE = `(() => {
@@ -266,6 +269,8 @@ async function main() {
 
       await browser.send("Page.navigate", { url: URL_BASE }, sessionId);
       await sleep(2200); // let the boot promise resolve and the first page paint
+      await browser.send("Runtime.evaluate", { expression: SET_THEME, returnByValue: true }, sessionId);
+      await sleep(150);
 
       if (DEEP) {
         const seen = new Map<string, string>();

@@ -129,7 +129,7 @@ export function BitRow({ encoded }: { encoded: string }) {
           protected format · {encoded.length} positions
         </p>
         <Tooltip content="This extra encoding makes sure that even a single-character change in the message will be very obviously different — like a checksum.">
-          <span className="text-primary">
+          <span className="text-accent-ink">
             <Icon name="info" size={14} />
           </span>
         </Tooltip>

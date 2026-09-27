@@ -35,7 +35,7 @@ export function Footer() {
             type="button"
             onClick={toggleTheme}
             aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
-            className="grid size-6 place-items-center text-n-500 transition-colors hover:text-primary"
+            className="grid size-6 place-items-center text-n-500 transition-colors hover:text-accent-ink"
           >
             <Icon name={theme === "light" ? "moon" : "sun"} size={14} />
           </button>

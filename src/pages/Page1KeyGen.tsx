@@ -260,7 +260,7 @@ export function Page1KeyGen() {
             )}
 
             <details className="group mt-5 border-t border-outline pt-3">
-              <summary className="micro cursor-pointer list-none select-none transition-colors hover:text-primary">
+              <summary className="micro cursor-pointer list-none select-none transition-colors hover:text-accent-ink">
                 <span className="group-open:hidden">+ how is this measured?</span>
                 <span className="hidden group-open:inline">− how is this measured?</span>
               </summary>

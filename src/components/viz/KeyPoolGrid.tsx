@@ -24,7 +24,7 @@ export function KeyPoolGrid({
         <span className="micro">key pool · filling</span>
         <span className="num text-[12px] font-semibold text-n-600 dark:text-n-700">
           <Counter value={created} />
-          <span className="text-n-400"> / <Counter value={total} /></span>
+          <span className="text-n-500"> / <Counter value={total} /></span>
         </span>
       </div>
 
@@ -55,7 +55,7 @@ export function KeyPoolGrid({
       {/* static explainer: the pool's multiplication, as an equation */}
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-outline pt-3">
         <Tooltip content="How the key pool is organised">
-          <span className="micro inline-flex items-center gap-1 text-primary">
+          <span className="micro inline-flex items-center gap-1 text-accent-ink">
             <Icon name="info" size={13} />
             layout
           </span>
@@ -67,7 +67,7 @@ export function KeyPoolGrid({
         <Factor n={meta?.slotsPerBlock} label="slots" />
         <span className="num text-[13px] font-semibold text-n-500">=</span>
         <span className="border border-primary/40 bg-[color-mix(in_oklab,var(--qs-primary)_9%,transparent)] px-2.5 py-1.5">
-          <span className="num text-[12px] font-semibold text-primary">
+          <span className="num text-[12px] font-semibold text-accent-ink">
             <Counter value={meta?.totalSlots ?? 0} />
           </span>
           <span className="micro ml-1.5">slots</span>
@@ -87,5 +87,5 @@ function Factor({ n, label }: { n: number | undefined; label: string }) {
 }
 
 function Op() {
-  return <span className="num text-[12px] font-semibold text-n-400">×</span>;
+  return <span className="num text-[12px] font-semibold text-n-500">×</span>;
 }

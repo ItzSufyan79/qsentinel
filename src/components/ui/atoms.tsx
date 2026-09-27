@@ -68,7 +68,7 @@ export function Panel({
 
 const BAND_COLOR: Record<"pending" | "active" | "done", string> = {
   pending: "var(--qs-n-400)",
-  active: "var(--qs-primary)",
+  active: "var(--qs-accent-ink)",
   done: "var(--qs-pass)",
 };
 
@@ -181,13 +181,15 @@ export function Tooltip({
 
 /* ------------------------------- Banner ----------------------------- */
 
-const BANNER: Record<Tone, { accent: string; icon: IconName }> = {
-  pass: { accent: "var(--qs-pass)", icon: "check" },
-  fail: { accent: "var(--qs-fail)", icon: "x" },
-  warn: { accent: "var(--qs-warn)", icon: "alert" },
-  pending: { accent: "var(--qs-pending)", icon: "clock" },
-  neutral: { accent: "var(--qs-n-400)", icon: "info" },
-  brand: { accent: "var(--qs-primary)", icon: "info" },
+/** `accent` paints the border and tint; `ink` is the text/icon colour, which
+    has to clear AA on the surface and so cannot always be the same token. */
+const BANNER: Record<Tone, { accent: string; ink: string; icon: IconName }> = {
+  pass: { accent: "var(--qs-pass)", ink: "var(--qs-pass)", icon: "check" },
+  fail: { accent: "var(--qs-fail)", ink: "var(--qs-fail)", icon: "x" },
+  warn: { accent: "var(--qs-warn)", ink: "var(--qs-warn)", icon: "alert" },
+  pending: { accent: "var(--qs-pending)", ink: "var(--qs-pending)", icon: "clock" },
+  neutral: { accent: "var(--qs-n-400)", ink: "var(--qs-n-500)", icon: "info" },
+  brand: { accent: "var(--qs-primary)", ink: "var(--qs-accent-ink)", icon: "info" },
 };
 
 export function Banner({
@@ -219,13 +221,13 @@ export function Banner({
       }}
       role="status"
     >
-      <span style={{ color: style.accent }} className="shrink-0">
+      <span style={{ color: style.ink }} className="shrink-0">
         <Icon name={style.icon} size={16} />
       </span>
       <div className="min-w-0 flex-1">
         <p
           className="num text-[11px] font-semibold tracking-[0.1em] uppercase"
-          style={{ color: style.accent }}
+          style={{ color: style.ink }}
         >
           {title}
         </p>

@@ -165,7 +165,7 @@ export function DistributionField({
               right={
                 <span>
                   <Counter value={target.received} />
-                  <span className="text-n-400"> / <Counter value={target.total} /></span>
+                  <span className="text-n-500"> / <Counter value={target.total} /></span>
                 </span>
               }
             />
