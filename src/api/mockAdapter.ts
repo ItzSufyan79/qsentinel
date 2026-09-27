@@ -10,6 +10,7 @@
 
 import { sleep } from "../lib/async";
 import * as sim from "./mockApi";
+import { bellState, measurementSeries, teleportTrace } from "./protocolFixtures";
 import type { QdsApi, RunContext, VerificationPlan } from "./contract";
 import type { VerifierTarget } from "./types";
 
@@ -99,6 +100,18 @@ export const mockApi: QdsApi = {
 
   agreementFor(_runId, results) {
     return Promise.resolve(sim.agreementFor(results));
+  },
+
+  fetchBellState() {
+    return Promise.resolve(bellState());
+  },
+
+  fetchTeleportTrace() {
+    return Promise.resolve(teleportTrace());
+  },
+
+  fetchMeasurements() {
+    return Promise.resolve(measurementSeries());
   },
 
   buildReport(_runId, verifierNames, results, attack, channelScore, seed) {

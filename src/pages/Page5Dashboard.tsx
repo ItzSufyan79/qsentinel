@@ -1,19 +1,26 @@
 import { useState } from "react";
 import { useFlow } from "../state/flowStore";
 import { api } from "../api";
+import { describeError, isCancellation } from "../api/errors";
 import { Banner, Chip, Panel, Skeleton, Stamp } from "../components/ui/atoms";
 import { Icon } from "../components/ui/Icon";
 import { BarCompare, RocChart } from "../components/viz/AnalyticsCharts";
 import { FingerprintChart } from "../components/viz/FingerprintChart";
 import { HealthGauge } from "../components/viz/HealthGauge";
+import { ForgeryCurveChart } from "../components/viz/ForgeryCurveChart";
 import { Heatmap } from "../components/viz/Heatmap";
 
-type Tab = "overview" | "analytics" | "logs";
+type Tab = "overview" | "analytics" | "guarantee" | "logs";
 
-const TABS: { id: Tab; label: string; code: string; icon: "layers" | "activity" | "terminal" }[] = [
-  { id: "overview", label: "Overview", code: "A", icon: "layers" },
-  { id: "analytics", label: "Analytics", code: "B", icon: "activity" },
-  { id: "logs", label: "Logs", code: "C", icon: "terminal" },
+const TABS: {
+  id: Tab;
+  label: string;
+  icon: "layers" | "activity" | "shield" | "terminal";
+}[] = [
+  { id: "overview", label: "Overview", icon: "layers" },
+  { id: "analytics", label: "Analytics", icon: "activity" },
+  { id: "guarantee", label: "Guarantee", icon: "shield" },
+  { id: "logs", label: "Logs", icon: "terminal" },
 ];
 
 export function Page5Dashboard() {
@@ -47,6 +54,10 @@ export function Page5Dashboard() {
       anchor.download = `qsentinel-evidence-${report.summary.seed}.json`;
       anchor.click();
       URL.revokeObjectURL(url);
+    } catch (err) {
+      if (!isCancellation(err)) {
+        useFlow.setState({ error: describeError(err, "evidence") });
+      }
     } finally {
       setExporting(false);
     }
@@ -70,6 +81,14 @@ export function Page5Dashboard() {
         >
           <Icon name="download" size={15} />
           {exporting ? "Preparing…" : "Evidence Report"}
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={() => store.goToPage(6)}
+        >
+          <Icon name="shield" size={15} />
+          Protocol
         </button>
         <button
           type="button"
@@ -208,13 +227,13 @@ export function Page5Dashboard() {
 
       {tab === "analytics" && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <Panel kicker="§7.5" title="Detection rate vs. false alarm rate">
+          <Panel kicker="§7.7" title="Detection rate vs. false alarm rate">
             <RocChart points={report.analytics.roc} axis={report.analytics.rocAxis} loading={false} />
             <p className="micro mt-3 border-t border-outline pt-2.5 leading-relaxed">
               Every point is supplied by the backend — nothing is derived on the client.
             </p>
           </Panel>
-          <Panel kicker="§7.6" title="This run vs. expected behaviour">
+          <Panel kicker="§7.8" title="This run vs. expected behaviour">
             <BarCompare data={report.analytics.bars} loading={false} />
             <p className="micro mt-3 border-t border-outline pt-2.5 leading-relaxed">
               Distance from the honest bar is what drives the classification.
@@ -223,9 +242,72 @@ export function Page5Dashboard() {
         </div>
       )}
 
+      {tab === "guarantee" && (
+        <div className="grid gap-4">
+          {report.security ? (
+            <>
+              <Panel
+                kicker="§7.5"
+                title="Security Guarantee"
+                subtitle="The three claims a technical panel asks for"
+              >
+                <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
+                  <Claim
+                    label="Honest acceptance"
+                    value={report.security.honestAcceptanceProbability === 1 ? "1.0" : report.security.honestAcceptanceProbability.toFixed(3)}
+                    note="legitimate signatures always accepted"
+                    tone={report.security.honestAcceptanceProbability === 1 ? "pass" : "warn"}
+                  />
+                  <Claim
+                    label="Observed forgery"
+                    value={report.security.observedForgeryProbability === 0 ? "0" : report.security.observedForgeryProbability.toExponential(2)}
+                    note="empirical success rate this run"
+                    tone={report.security.observedForgeryProbability === 0 ? "pending" : "pass"}
+                  />
+                  <Claim
+                    label="Claimed bound"
+                    value={report.security.claimedForgeryBound}
+                    note="the protocol's guarantee"
+                    tone="brand"
+                    small
+                  />
+                  <Claim
+                    label="False positives"
+                    value={`${report.security.falsePositives}`}
+                    note={`across ${report.security.trials.toLocaleString("en-US")} trials`}
+                    tone={report.security.falsePositives === 0 ? "pass" : "fail"}
+                  />
+                </div>
+                <p className="micro mt-4 border-t border-outline pt-3 leading-relaxed">
+                  Every figure here is calculated by the backend from sampled trials. The
+                  frontend displays these values and derives nothing from them.
+                </p>
+              </Panel>
+
+              <Panel
+                kicker="§7.6"
+                title="Forgery Probability Analysis"
+                subtitle="Empirical success rate against the number of blocks verified"
+              >
+                <ForgeryCurveChart curve={report.forgeryCurve} />
+              </Panel>
+            </>
+          ) : (
+            <Panel kicker="§7.5" title="Security Guarantee">
+              <p className="text-[13.5px] leading-relaxed text-n-600 dark:text-n-700">
+                This backend did not report a security summary, so no guarantee is claimed
+                for this run. Acceptance rate and forgery probability are part of the
+                evaluation the problem statement requires — ask the backend to populate{" "}
+                <code className="font-mono text-[12px]">DashboardReport.security</code>.
+              </p>
+            </Panel>
+          )}
+        </div>
+      )}
+
       {tab === "logs" && (
         <Panel
-          kicker="§7.7"
+          kicker="§7.9"
           title="Event Log"
           subtitle="Each entry is cryptographically chained to the previous one, so the log is tamper-evident."
         >
@@ -284,6 +366,43 @@ function Fact({
       >
         {value}
       </p>
+    </div>
+  );
+}
+
+function Claim({
+  label,
+  value,
+  note,
+  tone,
+  small = false,
+}: {
+  label: string;
+  value: string;
+  note: string;
+  tone: "pass" | "fail" | "warn" | "pending" | "brand";
+  small?: boolean;
+}) {
+  const color =
+    tone === "pass"
+      ? "var(--qs-pass)"
+      : tone === "fail"
+        ? "var(--qs-fail)"
+        : tone === "warn"
+          ? "var(--qs-warn)"
+          : tone === "brand"
+            ? "var(--qs-primary)"
+            : "var(--qs-n-500)";
+
+  return (
+    <div className="border-l-2 pl-3" style={{ borderColor: color }}>
+      <p className="micro">{label}</p>
+      <p
+        className={`num mt-1.5 font-semibold tracking-tight text-on-bg ${small ? "text-[13px] leading-snug" : "text-[19px]"}`}
+      >
+        {value}
+      </p>
+      <p className="mt-1 text-[11px] leading-snug text-n-500">{note}</p>
     </div>
   );
 }

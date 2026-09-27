@@ -36,6 +36,9 @@
  */
 
 import type {
+  BellStateResponse,
+  MeasurementSeries,
+  TeleportTrace,
   Agreement,
   AttackId,
   AttackResponse,
@@ -212,6 +215,22 @@ export interface QdsApi {
   /* ---- 11. evidence export ---------------------------------------- */
 
   fetchEvidence(runId: string, report: DashboardReport): Promise<Blob>;
+
+  /* ---- 13. protocol primitives (optional) ------------------------- */
+  /*
+   * These back the Protocol page. They are optional on purpose: a backend that
+   * has not built them yet still runs the full five-stage flow, and the page
+   * reports "not provided by this backend" rather than failing.
+   */
+
+  /** Bell-state entanglement: formula, amplitudes, correlation evidence. */
+  fetchBellState?(runId: string, ctx?: RunContext): Promise<BellStateResponse>;
+
+  /** Step-by-step teleportation, including the Pauli correction applied. */
+  fetchTeleportTrace?(runId: string, ctx?: RunContext): Promise<TeleportTrace>;
+
+  /** Projective measurement distributions, per basis. */
+  fetchMeasurements?(runId: string, ctx?: RunContext): Promise<MeasurementSeries[]>;
 }
 
 /* ------------------------------------------------------------------ *
@@ -252,6 +271,10 @@ export const ROUTES = {
   report: (id: string) => `/runs/${id}/report`,
   logs: (id: string) => `/runs/${id}/logs`,
   evidence: (id: string) => `/runs/${id}/evidence`,
+  protocolBell: (id: string) => `/runs/${id}/protocol/bell`,
+  protocolTeleport: (id: string) => `/runs/${id}/protocol/teleport`,
+  protocolMeasure: (id: string) => `/runs/${id}/protocol/measure`,
+  protocolForgery: (id: string) => `/runs/${id}/protocol/forgery`,
 } as const;
 
 /* ------------------------------------------------------------------ *

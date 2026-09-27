@@ -11,13 +11,16 @@ import { ApiError, ROUTES, type QdsApi, type RunContext, type VerificationPlan }
 import type {
   Agreement,
   AttackResponse,
+  BellStateResponse,
   ChannelHealthResponse,
   DashboardReport,
   DistributeResponse,
   InitResponse,
   KeygenResponse,
   LogEntry,
+  MeasurementSeries,
   SignResponse,
+  TeleportTrace,
   VerifierTarget,
   VerifyEvent,
 } from "./types";
@@ -254,6 +257,18 @@ export const httpApi: QdsApi = {
       method: "POST",
       body: JSON.stringify({ results }),
     });
+  },
+
+  fetchBellState(runId, ctx) {
+    return request<BellStateResponse>(ROUTES.protocolBell(runId), ctx);
+  },
+
+  fetchTeleportTrace(runId, ctx) {
+    return request<TeleportTrace>(ROUTES.protocolTeleport(runId), ctx);
+  },
+
+  fetchMeasurements(runId, ctx) {
+    return request<MeasurementSeries[]>(ROUTES.protocolMeasure(runId), ctx);
   },
 
   buildReport(runId, verifierNames, results, attack, channelScore, seed, ctx) {

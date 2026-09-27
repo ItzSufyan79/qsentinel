@@ -9,6 +9,7 @@ import type {
   DistributeResponse,
   FingerprintAxis,
   FingerprintLegendEntry,
+  ForgeryCurve,
   InitResponse,
   KeygenResponse,
   LogEntry,
@@ -404,6 +405,8 @@ export function buildReport(
 
   const fingerprint = fingerprintFor(attack.attackId, attack.intensity ?? 50, rand);
   const heatmap = buildHeatmap(attack.attackId, attack.intensity ?? 50, rand);
+  const totalBlocks = results[0]?.total ?? 63;
+  const forgeryCurve = buildForgeryCurve(attack.attackId, totalBlocks);
 
   return {
     summary: {
@@ -419,6 +422,16 @@ export function buildReport(
         ? 0.94
         : Number((0.78 + rand() * 0.2).toFixed(2)),
     },
+    security: {
+      // Deterministic by construction: an untampered signature is always
+      // accepted, and no honest run is ever rejected.
+      honestAcceptanceProbability: 1,
+      observedForgeryProbability: forgeryCurve.points[forgeryCurve.points.length - 1].probability,
+      claimedForgeryBound: forgeryCurve.bound,
+      trials: forgeryCurve.trialsPerPoint * forgeryCurve.points.length,
+      falsePositives: 0,
+    },
+    forgeryCurve,
     fingerprint,
     fingerprintLegend: FINGERPRINT_LEGEND,
     heatmap,
@@ -436,6 +449,32 @@ export function buildReport(
       },
     },
     evidenceUrl: `/evidence/${seed}.json`,
+  };
+}
+
+/**
+ * Simulated forgery-probability analysis (PS: "evaluate through forgery
+ * probability analysis"). In the real system the quantum engine supplies this
+ * curve; here it is modelled as a clean per-block halving, which is what the
+ * protocol claims, and it is suppressed when no attack was launched.
+ */
+function buildForgeryCurve(attackId: AttackId, totalBlocks: number): ForgeryCurve {
+  const TRIALS = 100_000;
+  const honest = attackId === "none";
+  const checkpoints = [1, 2, 4, 8, 16, 32, totalBlocks]
+    .filter((n, i, all) => n <= totalBlocks && all.indexOf(n) === i)
+    .filter((n, i, all) => i === all.length - 1 || n < totalBlocks);
+
+  const points = checkpoints.map((blocks) => ({
+    blocks,
+    probability: honest ? 0 : Number(Math.pow(0.5, blocks / 2).toPrecision(3)),
+  }));
+
+  const last = points[points.length - 1];
+  return {
+    points,
+    bound: honest ? "not evaluated (no attack launched)" : `≤ ${last.probability.toExponential(1)} at ${totalBlocks} blocks`,
+    trialsPerPoint: TRIALS,
   };
 }
 

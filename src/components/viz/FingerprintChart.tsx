@@ -42,9 +42,9 @@ export function FingerprintChart({
               <span className="absolute inset-y-0 right-0 w-px bg-outline-strong" />
             </div>
             <div className="mt-1 flex justify-between">
-              <span className="num text-[8px] text-n-400">0.00</span>
-              <span className="num text-[8px] text-n-400">0.50</span>
-              <span className="num text-[8px] text-n-400">1.00</span>
+              <span className="num text-[10px] text-n-500">0.00</span>
+              <span className="num text-[10px] text-n-500">0.50</span>
+              <span className="num text-[10px] text-n-500">1.00</span>
             </div>
           </div>
         ))}

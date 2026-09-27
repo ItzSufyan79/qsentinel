@@ -6,7 +6,7 @@
  * All values here are examples used by the mock backend for layout only.
  */
 
-export type PageId = 1 | 2 | 3 | 4 | 5;
+export type PageId = 1 | 2 | 3 | 4 | 5 | 6;
 
 export type ExplainMode = "simple" | "technical";
 
@@ -154,6 +154,7 @@ export interface DashboardReport {
     seed: number;
   };
   security?: SecuritySummary;
+  forgeryCurve?: ForgeryCurve;
   classification: {
     honest: boolean;
     label: string;
@@ -291,6 +292,7 @@ export interface EvidenceReport {
   exportedAt: string;
   run: DashboardReport;
   security?: SecuritySummary;
+  forgeryCurve?: ForgeryCurve;
   /** hash chain over the log, so the export is tamper-evident */
   logChain: { length: number; head: string };
 }

@@ -32,9 +32,25 @@ interface and the frontend works unchanged.
 | `buildLogs` | 5 | the tamper-evident event log |
 | `fetchEvidence` | 5 | the export blob |
 
+Three more are declared on `QdsApi` as **optional** — they only feed the
+Protocol page, so a backend that omits them still passes the core demo:
+
+| Optional method | Route | What it must return |
+| --- | --- | --- |
+| `fetchBellState` | `GET /runs/:runId/protocol/bell` | `BellStateResponse` |
+| `fetchTeleportTrace` | `GET /runs/:runId/protocol/teleport` | `TeleportTrace` |
+| `fetchMeasurements` | `GET /runs/:runId/protocol/measure` | `MeasurementSeries[]` |
+
+`ROUTES.protocolForgery` (`GET /runs/:runId/protocol/forgery`) is reserved but
+not yet called by the client: Page 6 reads the forgery curve from
+`buildReport` as `report.forgeryCurve`. If you implement the standalone route,
+send the same `ForgeryCurve` shape and it can be wired later without a
+breaking change.
+
 ## The three numbers judges will ask for
 
-They belong in `DashboardReport.security` (`SecuritySummary` in `types.ts`):
+They belong in `DashboardReport.security` (`SecuritySummary` in `types.ts`),
+and Page 5 renders them under the **Guarantee** tab:
 
 1. `honestAcceptanceProbability` — legitimate signatures accepted with
    probability **1**. Deterministic, not "usually".
@@ -46,14 +62,8 @@ They belong in `DashboardReport.security` (`SecuritySummary` in `types.ts`):
 
 The PS names four primitives we have to *display*: Bell-state entanglement,
 teleportation, Pauli correction, projective measurement. They are read-only
-additions, so the five existing pages work without them:
-
-```
-GET /runs/:runId/protocol/bell      -> BellStateResponse
-GET /runs/:runId/protocol/teleport  -> TeleportTrace
-GET /runs/:runId/protocol/measure   -> MeasurementSeries[]
-GET /runs/:runId/protocol/forgery   -> ForgeryCurve
-```
+additions, so the five core pages work without them — the routes are listed in
+the optional-methods table above.
 
 Shapes are in `src/api/types.ts` (`Amplitude`, `TeleportStep`,
 `MeasurementSeries`, `ForgeryCurve`). **Plain numbers only** — we plot

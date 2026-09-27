@@ -41,7 +41,7 @@ function BitCells({ encoded }: { encoded: string }) {
       {/* position ruler: 1 / 8 / 16 … 64 */}
       <div
         aria-hidden
-        className="mb-1 flex justify-between font-mono text-[8px] tracking-[0.1em] text-n-400"
+        className="mb-1 flex justify-between font-mono text-[10px] tracking-[0.1em] text-n-500"
       >
         <span>01</span>
         <span>16</span>
@@ -60,17 +60,23 @@ function BitCells({ encoded }: { encoded: string }) {
           return (
             <div key={i} className="flex flex-col items-stretch gap-[2px]">
               <span
-                className="grid aspect-square place-items-center font-mono text-[7px] leading-none font-bold transition-all duration-200 sm:text-[8px]"
+                className="grid aspect-square place-items-center font-mono text-[9px] leading-none font-bold transition-all duration-200"
                 style={{
                   background: shown
                     ? isOne
                       ? "var(--qs-secondary-variant)"
                       : "var(--qs-primary)"
                     : "var(--qs-n-200)",
-                  color: shown ? "var(--qs-on-secondary)" : "transparent",
+                  color: shown
+                    ? isOne
+                      ? "var(--qs-on-secondary)"
+                      : "var(--qs-on-primary)"
+                    : "transparent",
                 }}
               >
-                {shown ? bit : ""}
+                {/* 64 cells across a phone is ~5px each — the tile colour is
+                    the signal there, and the sr-only summary carries the text. */}
+                <span className="hidden sm:inline">{shown ? bit : ""}</span>
               </span>
               <span
                 className="block h-[5px] transition-colors duration-300"

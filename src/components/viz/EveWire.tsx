@@ -83,7 +83,7 @@ export function EveWire({
             title={hostile ? "Eve — simulated attacker on the wire" : "No adversary on the wire"}
           >
             <Icon name={hostile ? "eye" : "lock"} size={16} />
-            <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 font-mono text-[8px] tracking-[0.14em] text-n-500 uppercase">
+            <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 font-mono text-[9.5px] tracking-[0.14em] text-n-500 uppercase">
               eve
             </span>
           </span>

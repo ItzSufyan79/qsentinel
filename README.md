@@ -20,8 +20,9 @@ simulated — which is what "quantum-inspired" means here.
 
 ## The run
 
-A single locked five-step sequence. Navigation is sequential by design; you
-cannot jump ahead of the simulation.
+A single locked five-step sequence, plus one additive page. Navigation through
+the five core stages is sequential by design; you cannot jump ahead of the
+simulation. The Protocol page unlocks once verification completes.
 
 | Page | Stage | What you see |
 | --- | --- | --- |
@@ -30,6 +31,16 @@ cannot jump ahead of the simulation.
 | 3 | Sign | the message encoded one character per block, then an attack injected via a live Eve wire |
 | 4 | Verify | block-by-block results streamed in, with the expected-vs-observed distribution and agreement |
 | 5 | Dashboard | classification, fingerprint, heatmap, ROC curve, forged-vs-genuine bars, event log, evidence export |
+| 6 | Protocol | Bell-state amplitudes, teleportation trace with Pauli correction, measurement histogram |
+
+Page 5 has four tabs — **Overview**, **Analytics**, **Guarantee**, **Log**.
+Guarantee is where the three judge-facing numbers live: honest acceptance
+probability, observed forgery probability against the claimed bound, and false
+positives.
+
+Page 6 is read-only and optional. If the backend does not implement the three
+protocol endpoints, the page falls back to fixtures and the five core pages are
+unaffected.
 
 The channel can be forced to fail at any point, in which case the flow refuses to
 proceed — refusal is part of the demonstration, not an error.
@@ -98,11 +109,20 @@ here. See `.env.example`.
 | `npm run preview` | serve the production build |
 | `npm run lint` | oxlint |
 | `npm run smoke` | headless run of all flow assertions, no browser needed |
+| `npm run audit` | headless Chrome layout/contrast audit of pages 1–2 |
+| `npm run audit -- --deep` | also drives the flow and screenshots each page it reaches |
 
 `npm run smoke` covers the whole sequence end to end — keygen, distribution,
-signing, attack, streamed verification, report generation, navigation locking,
-and the failure branch that must halt the run. It runs in about a second, so
-there is no excuse for shipping a broken demo.
+signing, attack, streamed verification, report generation, protocol fixtures,
+security summary, navigation locking, and the failure branch that must halt the
+run. It runs in about a second, so there is no excuse for shipping a broken
+demo.
+
+`npm run audit` needs a running `npm run preview`. It checks horizontal
+overflow, clipped text, sub-9px type, and WCAG AA contrast at 1440 / 834 / 390.
+Screenshots land in `.audit/` (gitignored). Its `--deep` driver currently walks
+pages 1 and 2 only — **pages 3–6 have not been machine-audited and need a human
+pass** in the browser.
 
 ## Stack
 
@@ -122,10 +142,11 @@ decoration. The palette is a single system that flips to dark mode.
 
 ## Backend contract
 
-`src/api/contract.ts` declares the `QdsApi` interface — twelve methods, an HTTP
-route map, and a typed error taxonomy. `src/api/types.ts` holds every wire
-shape, including optional quantum extensions for Bell-state, teleportation,
-measurement and forgery-probability data.
+`src/api/contract.ts` declares the `QdsApi` interface — twelve required
+methods, three optional protocol methods, an HTTP route map, and a typed error
+taxonomy. `src/api/types.ts` holds every wire shape, including optional quantum
+extensions for Bell-state, teleportation, measurement and forgery-probability
+data.
 
 For the team building the engine, start with
 **[`src/api/HANDOFF.md`](src/api/HANDOFF.md)** and the long-form

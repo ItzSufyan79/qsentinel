@@ -4,6 +4,7 @@ import { ExplainToggle } from "./components/layout/ExplainToggle";
 import { Footer } from "./components/layout/Footer";
 import { RecapBanner } from "./components/layout/RecapBanner";
 import { TopStepper } from "./components/layout/TopStepper";
+import { ErrorPanel } from "./components/layout/ErrorPanel";
 import { SkipButton } from "./components/layout/Controls";
 import { Icon } from "./components/ui/Icon";
 import { Page1KeyGen } from "./pages/Page1KeyGen";
@@ -11,6 +12,7 @@ import { Page2Sign } from "./pages/Page2Sign";
 import { Page3Attack } from "./pages/Page3Attack";
 import { Page4Verify } from "./pages/Page4Verify";
 import { Page5Dashboard } from "./pages/Page5Dashboard";
+import { Page6Protocol } from "./pages/Page6Protocol";
 
 /** Square instrument mark: hairline frame, tick rule, no gradient, no radius. */
 function Logo() {
@@ -95,6 +97,9 @@ export default function App() {
 
       <div className="pt-3">
         <RecapBanner />
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <ErrorPanel />
+        </div>
       </div>
 
       <main className="canvas-grid flex-1 pt-10 pb-4">
@@ -104,6 +109,7 @@ export default function App() {
           {page === 3 && <Page3Attack />}
           {page === 4 && <Page4Verify />}
           {page === 5 && <Page5Dashboard />}
+          {page === 6 && <Page6Protocol />}
         </div>
       </main>
 

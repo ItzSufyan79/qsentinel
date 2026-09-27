@@ -7,8 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "smoke": "tsx scripts/smoke.ts",
-    "preview": "vite preview"
+    "smoke": "tsx scripts/smoke.ts && VITE_API_MODE=http VITE_API_URL=http://127.0.0.1:1 tsx scripts/smoke-fail.ts",
+    "preview": "vite preview",
+    "smoke:fail": "VITE_API_MODE=http VITE_API_URL=http://127.0.0.1:1 tsx scripts/smoke-fail.ts",
+    "audit": "tsx scripts/audit.ts"
   },
   "dependencies": {
     "react": "^19.2.8",

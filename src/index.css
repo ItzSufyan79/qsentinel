@@ -38,8 +38,8 @@
   --qs-n-200: #eae6f6;
   --qs-n-300: #dcd6ee;
   --qs-n-400: #b7aed4;
-  --qs-n-500: #8b809f;
-  --qs-n-600: #6a6080;
+  --qs-n-500: #736895;
+  --qs-n-600: #645a7a;
   --qs-n-700: #4a425e;
   --qs-n-800: #2f2940;
   --qs-n-900: #1d1830;
@@ -56,7 +56,7 @@
   --qs-r-sm: 1px;
 
   /* semantic state — never reused for anything else */
-  --qs-pass: #018786;
+  --qs-pass: #01716f;
   --qs-pass-tint: color-mix(in oklab, var(--qs-pass) 10%, transparent);
   --qs-fail: #b00020;
   --qs-fail-tint: color-mix(in oklab, var(--qs-fail) 8%, transparent);
