@@ -1,0 +1,725 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ==================================================================
+   QSentinel — "measurement instrument" design language
+
+   Palette source: provided spec sheet (Material-style light scheme).
+   Semantic state colours are locked app-wide:
+   teal = pass · red = fail · amber = warning · grey = pending
+   ================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* 1–4 brand */
+  --qs-primary: #6200ee;
+  --qs-primary-variant: #3700b3;
+  --qs-secondary: #03dac6;
+  --qs-secondary-variant: #018786;
+
+  /* 5–7 surfaces + error */
+  --qs-bg: #ffffff;
+  --qs-surface: #ffffff;
+  --qs-surface-2: #f7f5fd;
+  --qs-error: #b00020;
+
+  /* 8–12 content on top of the above */
+  --qs-on-primary: #ffffff;
+  --qs-on-secondary: #000000;
+  --qs-on-bg: #16121f;
+  --qs-on-surface: #16121f;
+  --qs-on-error: #ffffff;
+
+  /* neutral ramp (purple-tinted so it sits with the brand) */
+  --qs-n-50: #fbfaff;
+  --qs-n-100: #f4f2fb;
+  --qs-n-200: #eae6f6;
+  --qs-n-300: #dcd6ee;
+  --qs-n-400: #b7aed4;
+  --qs-n-500: #8b809f;
+  --qs-n-600: #6a6080;
+  --qs-n-700: #4a425e;
+  --qs-n-800: #2f2940;
+  --qs-n-900: #1d1830;
+
+  --qs-outline: #e4dff2;
+  --qs-outline-strong: #c6bde0;
+
+  /* ink — the near-black used for primary actions and data */
+  --qs-ink: #16121f;
+  --qs-ink-soft: #2a2438;
+
+  /* geometry: near-square, instrument-like */
+  --qs-r: 2px;
+  --qs-r-sm: 1px;
+
+  /* semantic state — never reused for anything else */
+  --qs-pass: #018786;
+  --qs-pass-tint: color-mix(in oklab, var(--qs-pass) 10%, transparent);
+  --qs-fail: #b00020;
+  --qs-fail-tint: color-mix(in oklab, var(--qs-fail) 8%, transparent);
+  --qs-warn: #9a5400;
+  --qs-warn-tint: color-mix(in oklab, var(--qs-warn) 12%, transparent);
+  --qs-pending: #8b809f;
+  --qs-pending-tint: color-mix(in oklab, var(--qs-pending) 12%, transparent);
+
+  /* motion — scaled globally by the fast-forward control */
+  --motion-scale: 1;
+  --dur-fast: calc(160ms * var(--motion-scale));
+  --dur-med: calc(320ms * var(--motion-scale));
+  --dur-flow: calc(1200ms * var(--motion-scale));
+  --dur-gauge: calc(1600ms * var(--motion-scale));
+  --dur-sweep: calc(2400ms * var(--motion-scale));
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --qs-bg: #100e18;
+  --qs-surface: #17141f;
+  --qs-surface-2: #1d1927;
+  --qs-on-bg: #f2effc;
+  --qs-on-surface: #f2effc;
+
+  --qs-n-50: #17141f;
+  --qs-n-100: #1d1927;
+  --qs-n-200: #272132;
+  --qs-n-300: #352d45;
+  --qs-n-400: #574d72;
+  --qs-n-500: #8b809f;
+  --qs-n-600: #a99fc4;
+  --qs-n-700: #cdc5e4;
+  --qs-n-800: #e6e1f4;
+  --qs-n-900: #f2effc;
+
+  --qs-outline: #2b2540;
+  --qs-outline-strong: #3f375c;
+  --qs-ink: #f2effc;
+  --qs-ink-soft: #e6e1f4;
+
+  --qs-pass: #17c8ad;
+  --qs-fail: #ff5f74;
+  --qs-warn: #f0a83c;
+  --qs-pending: #8b809f;
+
+  --qs-primary-variant: #7a3ff0;
+}
+
+@theme inline {
+  --color-primary: var(--qs-primary);
+  --color-primary-variant: var(--qs-primary-variant);
+  --color-secondary: var(--qs-secondary);
+  --color-secondary-variant: var(--qs-secondary-variant);
+
+  --color-bg: var(--qs-bg);
+  --color-surface: var(--qs-surface);
+  --color-surface-2: var(--qs-surface-2);
+  --color-error: var(--qs-error);
+  --color-on-primary: var(--qs-on-primary);
+  --color-on-secondary: var(--qs-on-secondary);
+  --color-on-bg: var(--qs-on-bg);
+  --color-on-surface: var(--qs-on-surface);
+  --color-on-error: var(--qs-on-error);
+
+  --color-n-50: var(--qs-n-50);
+  --color-n-100: var(--qs-n-100);
+  --color-n-200: var(--qs-n-200);
+  --color-n-300: var(--qs-n-300);
+  --color-n-400: var(--qs-n-400);
+  --color-n-500: var(--qs-n-500);
+  --color-n-600: var(--qs-n-600);
+  --color-n-700: var(--qs-n-700);
+  --color-n-800: var(--qs-n-800);
+  --color-n-900: var(--qs-n-900);
+  --color-outline: var(--qs-outline);
+  --color-outline-strong: var(--qs-outline-strong);
+  --color-ink: var(--qs-ink);
+  --color-ink-soft: var(--qs-ink-soft);
+
+  --color-pass: var(--qs-pass);
+  --color-fail: var(--qs-fail);
+  --color-warn: var(--qs-warn);
+  --color-pending: var(--qs-pending);
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
+
+  --ease-flow: var(--ease-out);
+}
+
+/* ------------------------------------------------------------------ */
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--qs-bg);
+    color: var(--qs-on-bg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-size: 15px;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--qs-primary) 20%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--qs-primary);
+    outline-offset: 2px;
+    border-radius: var(--qs-r);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--qs-n-400) transparent;
+  }
+}
+
+@layer components {
+  /* ---------- surfaces ------------------------------------------- */
+
+  /* hairline panel with corner registration marks — the core motif */
+  .card {
+    position: relative;
+    background: var(--qs-surface);
+    border: 1px solid var(--qs-outline);
+    border-radius: var(--qs-r);
+  }
+
+  .card::before,
+  .card::after {
+    content: "";
+    position: absolute;
+    width: 7px;
+    height: 7px;
+    pointer-events: none;
+    border-color: var(--qs-primary);
+    opacity: 0.55;
+  }
+
+  .card::before {
+    top: -1px;
+    left: -1px;
+    border-top: 1.5px solid;
+    border-left: 1.5px solid;
+  }
+
+  .card::after {
+    bottom: -1px;
+    right: -1px;
+    border-bottom: 1.5px solid;
+    border-right: 1.5px solid;
+  }
+
+  .card-muted {
+    background: var(--qs-surface-2);
+    border: 1px solid var(--qs-outline);
+    border-radius: var(--qs-r);
+  }
+
+  /* ruled header inside a panel */
+  .panel-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-bottom: 0.6rem;
+    margin-bottom: 1.1rem;
+    border-bottom: 1px solid var(--qs-outline);
+  }
+
+  /* ---------- micro typography ------------------------------------ */
+
+  .micro {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--qs-n-500);
+  }
+
+  .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .section-band {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0 0.55rem;
+    margin-bottom: 1.1rem;
+    border-top: 1px solid var(--qs-outline-strong);
+    border-bottom: 1px solid var(--qs-outline);
+  }
+
+  .section-band .idx {
+    display: grid;
+    place-items: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--qs-on-primary);
+    background: var(--qs-ink);
+    border-radius: var(--qs-r-sm);
+  }
+
+  .section-band[data-state="done"] .idx {
+    background: var(--qs-pass);
+  }
+
+  .section-band[data-state="active"] .idx {
+    background: var(--qs-primary);
+  }
+
+  .section-band[data-state="pending"] .idx {
+    background: var(--qs-n-300);
+    color: var(--qs-n-600);
+  }
+
+  .section-band .band-title {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--qs-on-bg);
+  }
+
+  .section-band .band-state {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  /* ---------- status tags ----------------------------------------- */
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 1px solid currentColor;
+    border-radius: var(--qs-r-sm);
+    padding: 0.1rem 0.4rem;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    line-height: 1.5;
+  }
+
+  .chip-pass { color: var(--qs-pass); background: var(--qs-pass-tint); }
+  .chip-fail { color: var(--qs-fail); background: var(--qs-fail-tint); }
+  .chip-warn { color: var(--qs-warn); background: var(--qs-warn-tint); }
+  .chip-pending { color: var(--qs-pending); background: var(--qs-pending-tint); }
+  .chip-neutral { color: var(--qs-n-600); background: var(--qs-surface-2); }
+  .chip-brand { color: var(--qs-primary); background: color-mix(in oklab, var(--qs-primary) 8%, transparent); }
+
+  /* ---------- buttons --------------------------------------------- */
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: 1px solid transparent;
+    border-radius: var(--qs-r);
+    padding: 0.6rem 0.95rem;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition:
+      background-color var(--dur-fast) linear,
+      color var(--dur-fast) linear,
+      border-color var(--dur-fast) linear,
+      transform var(--dur-fast) var(--ease-out);
+    will-change: transform;
+  }
+
+  .btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+
+  .btn:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  .btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    background: var(--qs-ink);
+    color: var(--qs-bg);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--qs-primary);
+    color: var(--qs-on-primary);
+  }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--qs-on-bg);
+    border-color: var(--qs-outline-strong);
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    border-color: var(--qs-ink);
+    background: var(--qs-surface-2);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--qs-n-600);
+  }
+
+  .btn-ghost:hover:not(:disabled) {
+    color: var(--qs-on-bg);
+    background: var(--qs-surface-2);
+  }
+
+  .btn-danger {
+    background: var(--qs-fail);
+    color: var(--qs-on-error);
+  }
+
+  .btn-danger:hover:not(:disabled) {
+    background: var(--qs-error);
+  }
+
+  .btn-sm {
+    padding: 0.42rem 0.7rem;
+    font-size: 10px;
+  }
+
+  /* ---------- data bars ------------------------------------------- */
+
+  .meter {
+    position: relative;
+    height: 6px;
+    width: 100%;
+    background: var(--qs-n-200);
+    overflow: hidden;
+  }
+
+  .meter-fill {
+    height: 100%;
+    transition: width var(--dur-med) var(--ease-out);
+  }
+
+  /* verdict stamp — double-ruled box, like a rubber stamp */
+  .stamp {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    border: 1.5px solid currentColor;
+    border-radius: var(--qs-r);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, currentColor 28%, transparent);
+    padding: 0.7rem 0.9rem;
+  }
+
+  .stamp-label {
+    font-family: var(--font-mono);
+    font-size: clamp(1rem, 3.2vw, 1.4rem);
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    line-height: 1;
+  }
+
+  /* ---------- loading --------------------------------------------- */
+
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background: var(--qs-n-100);
+    border-radius: var(--qs-r);
+  }
+
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: -50%;
+    background: repeating-linear-gradient(
+      -45deg,
+      color-mix(in oklab, var(--qs-n-300) 55%, transparent) 0 4px,
+      transparent 4px 9px
+    );
+    animation: qs-hatch 2.4s linear infinite;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .caption-text {
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: var(--qs-n-600);
+    max-width: 70ch;
+  }
+
+  .dark .caption-text {
+    color: var(--qs-n-700);
+  }
+
+  /* blueprint canvas grid */
+  .canvas-grid {
+    position: relative;
+    background-image:
+      linear-gradient(
+        to right,
+        color-mix(in oklab, var(--qs-outline) 70%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        color-mix(in oklab, var(--qs-outline) 70%, transparent) 1px,
+        transparent 1px
+      );
+    background-size: 26px 26px;
+    background-position: -1px -1px;
+  }
+}
+
+@layer utilities {
+  .animate-fade-up {
+    animation: qs-fade-up var(--dur-med) var(--ease-out) both;
+  }
+
+  .animate-pop {
+    animation: qs-pop var(--dur-med) var(--ease-out) both;
+  }
+
+  .animate-tick {
+    animation: qs-tick 320ms var(--ease-out) both;
+  }
+
+  .animate-shake {
+    animation: qs-shake 480ms var(--ease-in-out) both;
+  }
+
+  .animate-pulse-soft {
+    animation: qs-pulse-soft 1.8s var(--ease-in-out) infinite;
+  }
+
+  .animate-scan {
+    animation: qs-scan var(--dur-sweep) linear both;
+  }
+
+  .reduce-motion *,
+  .reduce-motion *::before,
+  .reduce-motion *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  keyframes                                                          */
+/* ------------------------------------------------------------------ */
+
+@keyframes qs-hatch {
+  from {
+    transform: translate(0, 0);
+  }
+  to {
+    transform: translate(-9px, 9px);
+  }
+}
+
+@keyframes qs-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes qs-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes qs-tick {
+  0% {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes qs-shake {
+  10%,
+  90% {
+    transform: translateX(-2px);
+  }
+  20%,
+  80% {
+    transform: translateX(4px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-6px);
+  }
+  40%,
+  60% {
+    transform: translateX(6px);
+  }
+}
+
+@keyframes qs-pulse-soft {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes qs-scan {
+  from {
+    left: -12%;
+  }
+  to {
+    left: 108%;
+  }
+}
+
+/* gauge needle while the backend is still measuring */
+@keyframes qs-seek {
+  0% {
+    transform: rotate(6deg);
+  }
+  45% {
+    transform: rotate(174deg);
+  }
+  100% {
+    transform: rotate(6deg);
+  }
+}
+
+/* packet on the wire — travel and colour are separate animations so they
+   share one timing function and stay in sync */
+@keyframes qs-travel {
+  from {
+    transform: translate(0, -50%);
+  }
+  to {
+    transform: translate(var(--wire-len, 240px), -50%);
+  }
+}
+
+@keyframes qs-recolor-idle {
+  0%,
+  100% {
+    background: var(--qs-primary);
+  }
+}
+
+@keyframes qs-recolor-alter {
+  0%,
+  46% {
+    background: var(--qs-primary);
+  }
+  54%,
+  100% {
+    background: var(--qs-fail);
+  }
+}
+
+@keyframes qs-recolor-grab {
+  0% {
+    background: var(--qs-primary);
+    opacity: 1;
+  }
+  45% {
+    opacity: 1;
+  }
+  49% {
+    opacity: 0;
+  }
+  53%,
+  100% {
+    opacity: 1;
+    background: var(--qs-secondary-variant);
+  }
+}
+
+@keyframes qs-recolor-swap {
+  0%,
+  46% {
+    background: var(--qs-primary);
+  }
+  54%,
+  100% {
+    background: var(--qs-fail);
+  }
+}
+
+@keyframes qs-recolor-reuse {
+  0%,
+  46% {
+    background: var(--qs-n-400);
+  }
+  54%,
+  100% {
+    background: var(--qs-warn);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Reduced motion — respect the OS setting, not just our toggle.      */
+/* ------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
