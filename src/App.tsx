@@ -32,6 +32,38 @@ import { DashboardPage } from "./pages/Dashboard";
 import { EventLogPage } from "./pages/EventLog";
 
 /* ------------------------------------------------------------------ */
+/*  Active run — polled once in the shell, shared by the badge and nav  */
+/* ------------------------------------------------------------------ */
+
+function useActiveRun() {
+  const [active, setActive] = useState<ActiveResponse>({
+    active: false,
+    runId: null,
+    phase: null,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await api.getActive();
+        if (!cancelled) setActive(res);
+      } catch {
+        // a badge must never take the app down
+      }
+    };
+    void poll();
+    const id = setInterval(() => void poll(), 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
+  return active;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Theme — dark is the default                                        */
 /* ------------------------------------------------------------------ */
 
@@ -64,48 +96,12 @@ function Wordmark() {
 /*  Nav links                                                          */
 /* ------------------------------------------------------------------ */
 
-const NAV = [
+const STATIC_NAV = [
   { to: "/", label: "Overview", icon: IconHome, end: true },
   { to: "/simulate/new", label: "New Simulation", icon: IconRocket, end: false },
   { to: "/dashboard", label: "Dashboard", icon: IconChartBar, end: false },
   { to: "/log", label: "Event Log", icon: IconListDetails, end: false },
 ] as const;
-
-/* ------------------------------------------------------------------ */
-/*  Active-run badge — polls GET /api/simulate/active                   */
-/* ------------------------------------------------------------------ */
-
-function ActiveBadge() {
-  const [active, setActive] = useState<ActiveResponse>({
-    active: false,
-    runId: null,
-    phase: null,
-  });
-
-  useEffect(() => {
-    let cancelled = false;
-    const poll = async () => {
-      try {
-        const res = await api.getActive();
-        if (!cancelled) setActive(res);
-      } catch {
-        // a badge must never take the app down
-      }
-    };
-    void poll();
-    const id = setInterval(() => void poll(), 4000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, []);
-
-  return (
-    <StatusBadge tone={active.active ? "disputed" : "pending"}>
-      {active.active ? `running · ${active.phase ?? ""}` : "idle"}
-    </StatusBadge>
-  );
-}
 
 /* ------------------------------------------------------------------ */
 /*  Theme toggle                                                       */
@@ -136,17 +132,55 @@ function ThemeToggle() {
 /*  Shell                                                              */
 /* ------------------------------------------------------------------ */
 
-function NavItems({ onNavigate }: { onNavigate?: () => void }) {
+function NavItems({
+  activeRunId,
+  onNavigate,
+}: {
+  activeRunId: string | null;
+  onNavigate?: () => void;
+}) {
+  // Live Run and Results are run-specific, so they fall back to New
+  // Simulation until a run exists — but they are always in the nav.
+  const runNav = [
+    {
+      to: activeRunId ? `/simulate/run/${activeRunId}` : "/simulate/new",
+      label: "Live Run",
+      icon: IconRoute,
+    },
+    {
+      to: activeRunId ? `/simulate/run/${activeRunId}/result` : "/simulate/new",
+      label: "Results",
+      icon: IconEye,
+    },
+  ];
+
   return (
     <>
-      {NAV.map(({ to, label, icon: Icon, end }) => (
+      {STATIC_NAV.map(({ to, label, icon: Icon, end }) => (
         <NavLink
           key={to}
           to={to}
           end={end as boolean | undefined}
           onClick={onNavigate}
           className={({ isActive }) =>
-            `flex items-center gap-2 rounded-[var(--qs-r)] px-3 py-2 font-condensed text-[13px] tracking-[0.04em] uppercase transition-colors ${
+            `flex flex-none items-center gap-2 rounded-[var(--qs-r)] px-3 py-2 font-condensed text-[13px] tracking-[0.04em] uppercase transition-colors ${
+              isActive
+                ? "bg-surface-2 font-semibold text-primary"
+                : "text-n-600 hover:text-on-bg"
+            }`
+          }
+        >
+          <Icon size={15} />
+          {label}
+        </NavLink>
+      ))}
+      {runNav.map(({ to, label, icon: Icon }) => (
+        <NavLink
+          key={to}
+          to={to}
+          onClick={onNavigate}
+          className={({ isActive }) =>
+            `flex flex-none items-center gap-2 rounded-[var(--qs-r)] px-3 py-2 font-condensed text-[13px] tracking-[0.04em] uppercase transition-colors ${
               isActive
                 ? "bg-surface-2 font-semibold text-primary"
                 : "text-n-600 hover:text-on-bg"
@@ -163,6 +197,8 @@ function NavItems({ onNavigate }: { onNavigate?: () => void }) {
 
 export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const activeRun = useActiveRun();
+  const activeRunId = activeRun.active ? activeRun.runId : null;
 
   // dark by default, applied before first paint via the class on <html>
   useEffect(() => {
@@ -176,12 +212,14 @@ export default function App() {
           <Wordmark />
 
           {/* desktop nav */}
-          <nav className="ml-6 hidden items-center gap-1 md:flex" aria-label="Primary">
-            <NavItems />
+          <nav className="ml-4 hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto md:flex" aria-label="Primary">
+            <NavItems activeRunId={activeRunId} />
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
-            <ActiveBadge />
+            <StatusBadge tone={activeRun.active ? "disputed" : "pending"}>
+              {activeRun.active ? `running · ${activeRun.phase ?? ""}` : "idle"}
+            </StatusBadge>
             <ThemeToggle />
             {/* hamburger under 768px */}
             <button
@@ -203,7 +241,10 @@ export default function App() {
             aria-label="Primary mobile"
           >
             <div className="flex flex-col gap-1">
-              <NavItems onNavigate={() => setMenuOpen(false)} />
+              <NavItems
+                activeRunId={activeRunId}
+                onNavigate={() => setMenuOpen(false)}
+              />
             </div>
           </nav>
         )}
