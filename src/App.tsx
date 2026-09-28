@@ -71,8 +71,21 @@ function useActiveRun() {
 /*  Theme — dark is the default, set on <html> before first paint        */
 /* ------------------------------------------------------------------ */
 
+/* The browser chrome colour per theme; the icon hrefs live in index.html. */
+const THEME_COLOR = { light: "#F6EFE7", dark: "#221D18" } as const;
+
 function applyTheme(theme: "light" | "dark") {
-  document.documentElement.classList.toggle("dark", theme === "dark");
+  const dark = theme === "dark";
+  document.documentElement.classList.toggle("dark", dark);
+
+  // The tab icon and the browser chrome have to follow the page: index.html
+  // only guesses from the OS setting, and the toggle can move off it.
+  for (const link of document.querySelectorAll<HTMLLinkElement>('link[rel~="icon"]')) {
+    link.disabled = link.dataset.theme === "dark" ? !dark : dark;
+  }
+  document
+    .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+    ?.setAttribute("content", THEME_COLOR[theme]);
 }
 
 /* ------------------------------------------------------------------ */

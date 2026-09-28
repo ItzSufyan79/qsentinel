@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="QSentinel">
+  <!-- dark mode: the lightened copper fill, warm-dark ink, notch in the page colour -->
+  <rect width="32" height="32" rx="7" fill="#D09A7A" />
+  <g fill="none" stroke="#221D18" stroke-width="4.2" stroke-linecap="round">
+    <circle cx="14.5" cy="14.5" r="8.2" />
+    <path d="M20.2 20.2 L24 24" />
+  </g>
+  <rect x="27" y="27" width="5" height="5" rx="1.5" fill="#221D18" />
+</svg>
