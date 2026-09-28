@@ -22,52 +22,59 @@ const OUT_DIR = join(process.cwd(), ".audit");
 const DEEP = process.argv.includes("--deep");
 /** Dark is the shipped default, so it has to be measurable too. */
 const THEME = process.argv.includes("--dark") ? "dark" : "light";
-const SET_THEME = `document.documentElement.classList.toggle("dark", ${JSON.stringify(THEME)} === "dark"); ${THEME}`;
+/**
+ * Force the theme and stop every colour transition before measuring: a
+ * mid-transition computed colour is a blend of the two palettes, which
+ * produces convincing but meaningless contrast numbers.
+ */
+const SET_THEME = `(() => {
+  let s = document.getElementById("qs-audit-freeze");
+  if (!s) {
+    s = document.createElement("style");
+    s.id = "qs-audit-freeze";
+    document.head.appendChild(s);
+  }
+  s.textContent = "*, *::before, *::after { transition: none !important; }";
+  document.documentElement.classList.toggle("dark", ${JSON.stringify(THEME)} === "dark");
+  return getComputedStyle(document.documentElement).getPropertyValue("--qs-bg").trim().toLowerCase();
+})()`;
+/** The app reads its theme from the class on <html>, so an assertable token. */
+const BG_TOKEN = THEME === "dark" ? "#221d18" : "#f6efe7";
+const CHECK_THEME = `getComputedStyle(document.documentElement).getPropertyValue("--qs-bg").trim().toLowerCase()`;
 
-/** Which page the app is on, read from the stepper's aria-current. */
+/** Reads the visible heading, which is how a step is identified. */
 const CURRENT_PAGE = `(() => {
-  const cur = document.querySelector('[aria-current="step"]');
-  if (cur) return (cur.textContent || '').split(' ').filter(Boolean).join(' ');
   const h1 = document.querySelector('h1');
   return h1 ? h1.textContent.trim() : '(no page)';
 })()`;
 
-const CLICK_NEXT = `(() => {
-  const btn = [...document.querySelectorAll('button.btn-primary')].find(
-    (b) => !b.disabled && b.offsetParent !== null,
-  );
+const LOCATION = "location.pathname";
+
+/** Picks an attack card by its label so a disputed run can be audited. */
+const PICK_ATTACK = `(() => {
+  const want = (${JSON.stringify("Collusion")}).toLowerCase();
+  const btn = [...document.querySelectorAll('button[aria-pressed]')]
+    .find((b) => (b.textContent || '').toLowerCase().includes(want));
+  if (!btn) return 'no-option';
+  btn.click();
+  return 'picked';
+})()`;
+
+const SUBMIT = `(() => {
+  const btn = [...document.querySelectorAll('button.btn-primary')]
+    .find((b) => !b.disabled && b.offsetParent !== null && /start simulation/i.test(b.textContent || ''));
   if (!btn) return 'no-button';
   btn.click();
-  return 'clicked';
+  return 'submitted';
 })()`;
 
-const SKIP = `(() => {
-  const ev = new KeyboardEvent('keydown', { key: 's', bubbles: true });
-  window.dispatchEvent(ev);
-  return 'skip';
-})()`;
-
-/** The flow is gated on a verifier count, so pick one before driving. */
-const CHOOSE_VERIFIERS = `(() => {
-  const opt = [...document.querySelectorAll('button[aria-pressed]')]
-    .find((b) => !b.disabled && b.offsetParent !== null);
-  if (!opt) return 'no-option';
-  opt.click();
-  return 'chose ' + opt.textContent.trim();
-})()`;
-
-/** Page 2 is gated on a message, so type one when the field appears. */
-const TYPE_MESSAGE = `(() => {
-  const el = document.querySelector('input[type="text"], textarea');
-  if (!el) return 'no-field';
-  const setter = Object.getOwnPropertyDescriptor(
-    el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype,
-    'value',
-  ).set;
-  setter.call(el, 'Transfer 42000 USD to escrow');
-  el.dispatchEvent(new Event('input', { bubbles: true }));
-  return 'typed';
-})()`;
+/** The static routes, all reachable without running a simulation. */
+const STATIC_ROUTES: { path: string; label: string }[] = [
+  { path: "/", label: "overview" },
+  { path: "/simulate/new", label: "new-simulation" },
+  { path: "/dashboard", label: "dashboard" },
+  { path: "/log", label: "event-log" },
+];
 
 const VIEWPORTS = [
   { name: "desktop", width: 1440, height: 900 },
@@ -115,6 +122,15 @@ const PROBE = `(() => {
     return false;
   };
 
+  /** WCAG 1.4.3 exempts inactive components, so a dimmed button is not a defect. */
+  const disabled = (el) => {
+    for (let n = el; n; n = n.parentElement) {
+      if (n.disabled === true) return true;
+      if (n.getAttribute && n.getAttribute('aria-disabled') === 'true') return true;
+    }
+    return false;
+  };
+
   for (const el of document.querySelectorAll('*')) {
     const r = el.getBoundingClientRect();
     if (r.width === 0 && r.height === 0) continue;
@@ -140,9 +156,12 @@ const PROBE = `(() => {
       continue;
     }
 
+    if (disabled(el)) continue;
+
     const fg = parse(cs.color);
     if (fg.length >= 3) {
-      const l1 = lum(fg), l2 = lum(bgOf(el));
+      const bg = bgOf(el);
+      const l1 = lum(fg), l2 = lum(bg);
       const ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
       const weight = Number(cs.fontWeight) || 400;
       const large = size >= 24 || (size >= 18.66 && weight >= 700);
@@ -151,6 +170,8 @@ const PROBE = `(() => {
         res.lowContrast.push({
           ratio: Math.round(ratio * 100) / 100, min,
           size: Math.round(size * 10) / 10, text: text.slice(0, 44),
+          fg: 'rgb(' + fg.slice(0, 3).join(',') + ')', bg: 'rgb(' + bg.join(',') + ')',
+          opacity: Number(cs.opacity), disabled: disabled(el),
         });
       }
     }
@@ -211,6 +232,14 @@ class Cdp {
     });
   }
 
+  /** Subscribe to an event; the payload is handed to the listener. */
+  on(method: string, listener: (params: unknown) => void) {
+    this.ws.addEventListener("message", (event) => {
+      const msg = JSON.parse(String(event.data)) as { method?: string; params?: unknown };
+      if (msg.method === method) listener(msg.params);
+    });
+  }
+
   static async open(url: string): Promise<Cdp> {
     const ws = new WebSocket(url);
     await new Promise((resolve, reject) => {
@@ -224,12 +253,28 @@ class Cdp {
 interface ProbeResult {
   overflow: { tag: string; cls: string; left: number; right: number }[];
   tinyText: { size: number; text: string }[];
-  lowContrast: { ratio: number; min: number; size: number; text: string }[];
+  lowContrast: {
+    ratio: number; min: number; size: number; text: string;
+    fg: string; bg: string; opacity: number; disabled: boolean;
+  }[];
   clipped: { text: string; scroll: number; client: number }[];
   tall: number;
   elements: number;
   rootChildren: number;
   title: string;
+}
+
+async function evalString(
+  browser: Cdp,
+  sessionId: string,
+  expression: string,
+): Promise<string> {
+  const out = (await browser.send(
+    "Runtime.evaluate",
+    { expression, returnByValue: true },
+    sessionId,
+  )) as { result: { value?: unknown } };
+  return typeof out.result.value === "string" ? out.result.value : String(out.result.value);
 }
 
 async function main() {
@@ -261,100 +306,152 @@ async function main() {
     })) as { sessionId: string };
 
     await browser.send("Page.enable", {}, sessionId);
+    await browser.send("Runtime.enable", {}, sessionId);
+
+    const consoleErrors: string[] = [];
+    browser.on("Runtime.consoleAPICalled", (params) => {
+      const args = (params as { args?: { value?: unknown }[] }).args ?? [];
+      const text = args.map((a) => String(a.value)).join(" ");
+      if (/error/i.test(text)) consoleErrors.push(text.slice(0, 160));
+    });
+    browser.on("Runtime.exceptionThrown", (params) => {
+      const d = (params as { exceptionDetails?: { text?: string } }).exceptionDetails;
+      if (d?.text) consoleErrors.push(d.text.slice(0, 160));
+    });
 
     for (const vp of VIEWPORTS) {
       await browser.send("Emulation.setDeviceMetricsOverride", {
         width: vp.width, height: vp.height, deviceScaleFactor: 1, mobile: vp.width < 500,
       }, sessionId);
 
-      await browser.send("Page.navigate", { url: URL_BASE }, sessionId);
-      await sleep(2200); // let the boot promise resolve and the first page paint
+      /* ---- create one real run, so the live/result/arbitration
+              routes have a run id to be audited against ---- */
+      let runId = "";
+      await browser.send("Page.navigate", { url: `${URL_BASE}/simulate/new` }, sessionId);
+      await sleep(2000);
       await browser.send("Runtime.evaluate", { expression: SET_THEME, returnByValue: true }, sessionId);
-      await sleep(150);
+      await evalString(browser, sessionId, PICK_ATTACK);
+      await sleep(500);
+      // the collusion scenario needs at least two verifiers
+      await browser.send("Runtime.evaluate", {
+        expression: `(() => {
+          const btn = document.querySelector('button[aria-label="2 verifiers"]');
+          if (!btn) return 'no-stepper';
+          btn.click();
+          return 'verifiers=2';
+        })()`,
+        returnByValue: true,
+      }, sessionId);
+      await sleep(400);
+      await evalString(browser, sessionId, SUBMIT);
+      // the app navigates to the live run once the backend accepts it
+      for (let i = 0; i < 30 && !runId; i++) {
+        await sleep(300);
+        const path = await evalString(browser, sessionId, LOCATION);
+        const m = path.match(/\/simulate\/run\/([^/]+)/);
+        if (m) runId = m[1]!;
+      }
+      if (!runId && DEEP) console.log(`   ! could not start a run at ${vp.name}`);
 
-      if (DEEP) {
-        const seen = new Map<string, string>();
-        await browser.send("Runtime.evaluate", {
-          expression: CHOOSE_VERIFIERS, returnByValue: true,
-        }, sessionId);
-        await sleep(400);
-        for (let i = 0; i < 40; i++) {
-          const page = (await browser.send("Runtime.evaluate", {
-            expression: CURRENT_PAGE, returnByValue: true,
-          }, sessionId)) as { result: { value: string } };
-          const label = page.result.value;
+      const routes = [
+        ...STATIC_ROUTES,
+        ...(runId
+          ? [
+              { path: `/simulate/run/${runId}`, label: "live-run" },
+              { path: `/simulate/run/${runId}/result`, label: "results" },
+              { path: `/simulate/run/${runId}/arbitration`, label: "arbitration" },
+            ]
+          : []),
+      ];
 
-          if (!seen.has(label)) {
-            const shot = (await browser.send("Page.captureScreenshot", {
-              format: "png",
-            }, sessionId)) as { data: string };
-            const slug = label.replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 28) || `step${i}`;
-            writeFileSync(join(OUT_DIR, `${vp.name}-${slug}.png`), Buffer.from(shot.data, "base64"));
-            seen.set(label, slug);
-            console.log(`   captured "${label}"`);
-          }
+      for (const route of routes) {
+        await browser.send("Page.navigate", { url: URL_BASE + route.path }, sessionId);
+        // live runs animate through their phases; give them room to settle
+        await sleep(route.label === "live-run" ? 3500 : 1400);
+        await browser.send("Runtime.evaluate", { expression: SET_THEME, returnByValue: true }, sessionId);
+        await sleep(120);
 
-          await browser.send("Runtime.evaluate", { expression: TYPE_MESSAGE, returnByValue: true }, sessionId);
-          await sleep(150);
-          await browser.send("Runtime.evaluate", { expression: CLICK_NEXT, returnByValue: true }, sessionId);
-          await sleep(500);
-          await browser.send("Runtime.evaluate", { expression: SKIP, returnByValue: true }, sessionId);
-          await sleep(700);
+        /* The app owns the class on <html>, so a re-render can reinstate the
+           theme after we set it. Measuring contrast against the wrong palette
+           produces convincing nonsense — re-assert, then assert. */
+        let themeOk = (await evalString(browser, sessionId, CHECK_THEME)) === BG_TOKEN;
+        if (!themeOk) {
+          await browser.send("Runtime.evaluate", { expression: SET_THEME, returnByValue: true }, sessionId);
+          await sleep(200);
+          themeOk = (await evalString(browser, sessionId, CHECK_THEME)) === BG_TOKEN;
         }
-        console.log(`   drove ${seen.size} distinct page(s)`);
-      }
+        if (!themeOk) {
+          console.log(
+            `\n✗ ${vp.name} ${route.path}: could not hold the ${THEME} theme, ` +
+            `so its contrast numbers would be meaningless.`,
+          );
+          problems += 100;
+          continue;
+        }
 
-      const evaluated = (await browser.send("Runtime.evaluate", {
-        expression: PROBE, returnByValue: true,
-      }, sessionId)) as { result: { value: ProbeResult } };
-      const probe = evaluated.result.value;
+        const evaluated = (await browser.send("Runtime.evaluate", {
+          expression: PROBE, returnByValue: true,
+        }, sessionId)) as { result: { value: ProbeResult } };
+        const probe = evaluated.result.value;
 
-      const shot = (await browser.send("Page.captureScreenshot", {
-        format: "png",
-      }, sessionId)) as { data: string };
-      writeFileSync(join(OUT_DIR, `${vp.name}.png`), Buffer.from(shot.data, "base64"));
+        const shot = (await browser.send("Page.captureScreenshot", {
+          format: "png",
+        }, sessionId)) as { data: string };
+        writeFileSync(join(OUT_DIR, `${vp.name}-${route.label}.png`), Buffer.from(shot.data, "base64"));
 
-      if (probe.rootChildren === 0 || probe.elements < 40) {
+        if (probe.rootChildren === 0 || probe.elements < 40) {
+          console.log(
+            `\n✗ ${vp.name}${route.path}: the app did not render (${probe.elements} elements, ` +
+            `root has ${probe.rootChildren} children). Results are meaningless.`,
+          );
+          problems += 100;
+          continue;
+        }
+
+        const counts = {
+          overflow: probe.overflow.length,
+          tinyText: probe.tinyText.length,
+          lowContrast: probe.lowContrast.length,
+          clipped: probe.clipped.length,
+        };
+        const total = Object.values(counts).reduce((a, b) => a + b, 0);
+        problems += total;
+
+        const heading = await evalString(browser, sessionId, CURRENT_PAGE);
         console.log(
-          `\n✗ ${vp.name}: the app did not render (${probe.elements} elements, ` +
-          `root has ${probe.rootChildren} children, title "${probe.title}"). ` +
-          `Is the server up at ${URL_BASE}? Results below are meaningless.`,
+          `\n${vp.name} ${vp.width}×${vp.height}  ${route.path}  "${heading}" — ` +
+          `${probe.elements} elements, height ${probe.tall}px, ` +
+          `overflow ${counts.overflow}, tiny ${counts.tinyText}, ` +
+          `low-contrast ${counts.lowContrast}, clipped ${counts.clipped}`,
         );
-        problems += 100;
-        continue;
+        for (const o of probe.overflow.slice(0, 4)) {
+          console.log(`   overflow  <${o.tag} class="${o.cls}"> ${o.left}→${o.right}`);
+        }
+        for (const t of probe.tinyText.slice(0, 4)) {
+          console.log(`   tiny      ${t.size}px  "${t.text}"`);
+        }
+        for (const c of probe.lowContrast.slice(0, 4)) {
+          console.log(
+            `   contrast  ${c.ratio}:1 (needs ${c.min}) ${c.size}px  "${c.text}"  ` +
+            `${c.fg} on ${c.bg} opacity=${c.opacity}${c.disabled ? " disabled" : ""}`,
+          );
+        }
+        for (const c of probe.clipped.slice(0, 4)) {
+          console.log(`   clipped   "${c.text}" ${c.client}px box, ${c.scroll}px content`);
+        }
       }
+    }
 
-      const counts = {
-        overflow: probe.overflow.length,
-        tinyText: probe.tinyText.length,
-        lowContrast: probe.lowContrast.length,
-        clipped: probe.clipped.length,
-      };
-      const total = Object.values(counts).reduce((a, b) => a + b, 0);
-      problems += total;
-
-      console.log(
-        `\n${vp.name} ${vp.width}×${vp.height} — ${probe.elements} elements, ` +
-        `page height ${probe.tall}px, ` +
-        `overflow ${counts.overflow}, tiny ${counts.tinyText}, ` +
-        `low-contrast ${counts.lowContrast}, clipped ${counts.clipped}`,
-      );
-      for (const o of probe.overflow.slice(0, 5)) {
-        console.log(`   overflow  <${o.tag} class="${o.cls}"> ${o.left}→${o.right}`);
-      }
-      for (const t of probe.tinyText.slice(0, 5)) {
-        console.log(`   tiny      ${t.size}px  "${t.text}"`);
-      }
-      for (const c of probe.lowContrast.slice(0, 5)) {
-        console.log(`   contrast  ${c.ratio}:1 (needs ${c.min}) ${c.size}px  "${c.text}"`);
-      }
-      for (const c of probe.clipped.slice(0, 5)) {
-        console.log(`   clipped   "${c.text}" ${c.client}px box, ${c.scroll}px content`);
-      }
+    if (consoleErrors.length > 0) {
+      const unique = [...new Set(consoleErrors)];
+      console.log(`\n! ${unique.length} console error(s):`);
+      for (const e of unique.slice(0, 10)) console.log(`   ${e}`);
+      problems += unique.length;
     }
 
     console.log(`\nScreenshots in ${OUT_DIR}`);
     console.log(problems === 0 ? "No layout problems detected." : `${problems} item(s) to review.`);
+    if (problems > 0) process.exitCode = 1;
   } finally {
     chrome.kill();
   }

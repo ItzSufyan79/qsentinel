@@ -10,7 +10,7 @@
  * the UI displays arrives in one of these shapes.
  */
 
-import type { ReactNode } from "react";
+import type { IconName } from "../lib/iconNames";
 
 /* ------------------------------------------------------------------ *
  *  Attack model — the nine options from spec section 4.2
@@ -32,74 +32,106 @@ export interface AttackOption {
   label: string;
   /** one line: what it does and which phase it hits (static lookup) */
   description: string;
+  /** the Tabler concept that represents this scenario in the UI */
+  icon: IconName;
   /** true for the attacks that interpose a node on the quantum channel */
   intercepts: boolean;
+  /** true when the scenario has an attack-fraction control */
   hasIntensity: boolean;
+  /** the backend requires at least this many verifiers for this scenario */
+  minVerifiers: number;
 }
 
 export const ATTACK_OPTIONS: AttackOption[] = [
   {
     id: "honest",
     label: "Honest baseline",
-    description: "No adversary. Establishes the error-rate floor every other run is judged against.",
+    description:
+      "No adversary. Establishes the error-rate floor that every other run is judged against.",
+    icon: "shield-check",
     intercepts: false,
     hasIntensity: false,
+    minVerifiers: 1,
   },
   {
     id: "forgery",
     label: "Forgery",
-    description: "Signs a different message with a mismatched key. Hits the signing phase.",
+    description:
+      "Signatures a different message with key material that does not match the one the verifiers hold.",
+    icon: "alert-triangle",
     intercepts: false,
     hasIntensity: false,
+    minVerifiers: 1,
   },
   {
     id: "impersonation",
     label: "Impersonation",
-    description: "A party with no key material claims to be the sender. Hits the signing phase.",
+    description:
+      "A party with no legitimate key half claims to be the signer and produces a signature anyway.",
+    icon: "eye",
     intercepts: false,
     hasIntensity: false,
+    minVerifiers: 1,
   },
   {
     id: "replay",
-    label: "Intercept-resend replay",
-    description: "Replays a previously captured signature. Freshness checks fail across the block set.",
-    intercepts: true,
+    label: "Replay",
+    description:
+      "Replays a previously valid transmission. Detected by nonce and session validation, not by intercept-resend.",
+    icon: "list-details",
+    intercepts: false,
     hasIntensity: false,
+    minVerifiers: 1,
   },
   {
     id: "intercept-fixed",
-    label: "Fixed-basis intercept",
-    description: "Measures every state in one fixed basis. Errors cluster where that basis disagreed.",
+    label: "Fixed-basis intercept-resend",
+    description:
+      "Measures every transmitted state in one fixed basis. Errors cluster where that basis disagreed.",
+    icon: "atom",
     intercepts: true,
     hasIntensity: false,
+    minVerifiers: 1,
   },
   {
     id: "intercept-random",
-    label: "Random-basis stealth intercept",
-    description: "Measures in a random basis each time. Produces a scattered, low-density error pattern.",
+    label: "Random-basis intercept-resend",
+    description:
+      "Chooses a measurement basis at random per state, spreading the induced error across both bases.",
+    icon: "atom",
     intercepts: true,
     hasIntensity: false,
+    minVerifiers: 1,
   },
   {
     id: "partial",
     label: "Partial / stealth intercept",
-    description: "Alters only a fraction of the transmitted data. Intensity controls how much.",
+    description:
+      "Attacks only a fraction of the transmitted qubits. A small enough fraction can stay below the detection threshold.",
+    icon: "activity",
     intercepts: true,
     hasIntensity: true,
+    minVerifiers: 1,
   },
   {
     id: "tampering",
     label: "Classical channel tampering",
-    description: "Alters the Pauli correction step in transit. Produces a periodic error signature.",
-    intercepts: true,
+    description:
+      "Modifies the classical data in transit. Rejected by the MAC check before quantum verification matters.",
+    icon: "lock",
+    intercepts: false,
     hasIntensity: false,
+    minVerifiers: 1,
   },
   {
     id: "collusion",
     label: "Verifier collusion",
-    description: "Two verifiers report conflicting outcomes. Routed to the Arbitration page.",
+    description:
+      "Two verifiers report conflicting outcomes for the same signature, so the run is routed to arbitration.",
+    icon: "scale",
     intercepts: false,
     hasIntensity: false,
+    minVerifiers: 2,
   },
 ];
 
@@ -112,34 +144,59 @@ export const attackLabel = (id: AttackTypeId): string =>
 
 export type Verdict = "accepted" | "rejected";
 export type BlockStatus = "pending" | "pass" | "fail";
-
-export interface Stat {
-  label: string;
-  value: string;
-}
-
-export interface InitResponse {
-  runId: string;
-  seed: number;
-  hardwareProfile: { label: string; stats: Stat[] };
-  verifierCountOptions: number[];
-}
+/** a verifier that has not finished reporting is still "pending", not a verdict */
+export type VerifierVerdict = "pending" | Verdict;
 
 /** GET /api/simulate/preview */
 export interface PreviewResponse {
   attackType: AttackTypeId;
-  n: number;
+  noise: number;
+  qubitsPerSlot: number;
+  verifierCount: number;
+  /** the threshold the backend would derive for this configuration */
   threshold: number;
-  /** predicted detection confidence at this N, so the preview is never blank */
-  predictedDetectionConfidence: number;
+  thresholdSource: ThresholdSource;
+  /** null when the backend has no prediction for this configuration */
+  predictedDetectionConfidence: number | null;
+  /** backend-declared valid ranges, so the UI never hardcodes a limit */
+  supported: {
+    noise: { min: number; max: number; default: number; step: number };
+    qubitsPerSlot: { min: number; max: number; default: number; step: number };
+    verifierCount: { min: number; max: number; default: number };
+  };
 }
+
+/**
+ * The user-controlled configuration. Only these fields are sent to the backend —
+ * everything else in a QDS run (bases, Bell pairs, nonces, MAC key, seed) is
+ * generated server-side.
+ */
+export interface SimulationParameters {
+  attackType: AttackTypeId;
+  /** channel noise as a fraction, e.g. 0.02 for 2% */
+  noise: number;
+  qubitsPerSlot: number;
+  verifierCount: number;
+  /** partial / stealth intercept only; fraction of qubits attacked, 0–1 */
+  attackFraction?: number;
+  /** only sent when the user overrides the backend-derived threshold */
+  thresholdOverride?: number;
+}
+
+export type ThresholdSource = "derived" | "override";
 
 /** POST /api/simulate/run */
 export interface RunResponse {
   runId: string;
   attackType: AttackTypeId;
-  n: number;
+  noise: number;
+  qubitsPerSlot: number;
+  verifierCount: number;
+  attackFraction: number | null;
+  /** always backend-supplied, whether derived or overridden */
   threshold: number;
+  thresholdSource: ThresholdSource;
+  /** the backend stores this so a run can be reproduced */
   seed: number;
 }
 
@@ -181,21 +238,6 @@ export interface SignResponse {
   intercepts: boolean;
 }
 
-export interface EveKnowledge {
-  has: string[];
-  hasNot: string[];
-}
-
-/** Attack detail, echoed by the signing/verification endpoints. */
-export interface AttackResponse {
-  attackType: AttackTypeId;
-  label: string;
-  intensity: number | null;
-  /** which animation the Eve node should play */
-  visualization: "idle" | "grab" | "swap" | "alter" | "reuse";
-  eve: EveKnowledge;
-}
-
 export interface BlockResult {
   index: number;
   mismatches: number;
@@ -209,7 +251,7 @@ export interface VerifierResult {
   checked: number;
   total: number;
   failed: number;
-  verdict: "pending" | "accepted" | "rejected";
+  verdict: VerifierVerdict;
 }
 
 export interface VerifyEvent {
@@ -219,16 +261,74 @@ export interface VerifyEvent {
   result: VerifierResult;
 }
 
+/**
+ * Which check rejected the run. The backend picks this; the frontend never
+ * infers a mechanism from the attack type.
+ */
+export type DetectionMechanism =
+  | "quantum-error-rate"
+  | "classical-mac"
+  | "nonce-session-validation"
+  | "verifier-cross-check"
+  | "none";
+
+/** Overall outcome as reported by the backend. */
+export type DetectionStatus = "detected" | "not-detected";
+
+/** Per-basis error breakdown, returned by the intercept-resend scenarios. */
+export interface BasisBreakdown {
+  zBasisMismatch: number;
+  xBasisMismatch: number;
+  zBasisSamples: number;
+  xBasisSamples: number;
+}
+
+/**
+ * Ground-truth difference for a non-honest run. Every field is optional
+ * because each scenario has its own evidence; the UI renders only what came
+ * back. No key material is ever carried here.
+ */
+export interface AttackEvidence {
+  /** qubits the attacker actually touched, when the backend counts them */
+  affectedQubits?: number;
+  /** fraction of qubits attacked, partial / stealth only */
+  attackFraction?: number;
+  /** expected vs observed error density, when measured */
+  expectedMismatchRate?: number;
+  /** intercept-resend only */
+  basisBreakdown?: BasisBreakdown;
+  /** replay only */
+  originalRunId?: string;
+  nonceStatus?: "reused" | "fresh" | "unknown";
+  nonceValue?: string;
+  /** classical tampering only */
+  macStatus?: "verified" | "failed" | "not-checked";
+  tamperedField?: string;
+  /** collusion only */
+  crossCheckStatus?: "matched" | "diverged";
+  verifierDivergence?: number;
+  /** short sentences the backend attaches to this specific run */
+  notes?: string[];
+}
+
 /** GET /api/simulate/{run_id}/result */
 export interface ResultResponse {
   runId: string;
+  attackType: AttackTypeId;
+  /** "detected" when an attack was flagged; "not-detected" when it slipped through */
+  detectionStatus: DetectionStatus;
+  /** per-verifier outcome, kept separate from the run-level status */
   verdict: Verdict;
   /** observed mismatch rate across all verified blocks */
   mismatchRate: number;
   threshold: number;
-  /** p-value style: "this error rate has a 1-in-X chance under an honest run" */
-  confidence: string;
-  flaggedBy: "quantum-error-rate" | "classical-mac" | "verifier-cross-check" | "none";
+  thresholdSource: ThresholdSource;
+  /** null unless the backend computes a statistic for this run */
+  confidence: string | null;
+  flaggedBy: DetectionMechanism;
+  evidence: AttackEvidence;
+  /** true only when verifiers disagreed — gates the Arbitration link */
+  arbitrationAvailable: boolean;
   /** what the attacker changed vs. what the signer sent — only when not honest */
   flaggedDiff?: { sent: string; received: string }[];
   verifiers: VerifierResult[];
@@ -255,8 +355,9 @@ export interface ArbitrationResponse {
 
 /** GET /api/simulate/active — polled by the global nav badge */
 export interface ActiveResponse {
-  active: boolean;
+  status: "none" | "running" | "completed" | "disputed";
   runId: string | null;
+  /** the phase the run is in, when one is active */
   phase: string | null;
 }
 
@@ -270,6 +371,12 @@ export interface StatsSummary {
   detectionRate: number;
   avgMismatchHonest: number;
   avgMismatchAttacked: number;
+  /**
+   * Share of runs in which every verifier reached the same verdict. Optional:
+   * a backend that does not track agreement omits it, and the dashboard shows
+   * "not reported" rather than inventing a number.
+   */
+  verifierAgreementRate?: number;
 }
 
 /** GET /api/stats/by-attack-type */
@@ -307,8 +414,10 @@ export interface LogEntry {
   label: string;
   runId: string;
   verdict: Verdict;
-  flaggedBy: string;
+  flaggedBy: DetectionMechanism;
   detected: boolean;
+  /** ISO date, so the log view can offer a date filter */
+  date: string;
 }
 
 /** GET /api/log */
@@ -317,6 +426,19 @@ export interface LogPage {
   page: number;
   totalPages: number;
   total: number;
+}
+
+/**
+ * Optional refinements for the log endpoints. Sent only when set, so a backend
+ * that has not implemented them still answers with the unfiltered page.
+ */
+export interface LogQuery {
+  /** "accepted" | "rejected" | "all" */
+  verdict?: Verdict | "all";
+  /** ISO date, e.g. "2026-09-28" */
+  date?: string;
+  /** free text matched against the run id, label and flagged_by */
+  search?: string;
 }
 
 /* ------------------------------------------------------------------ *
@@ -328,6 +450,7 @@ export type ApiErrorCode =
   | "TIMEOUT"
   | "ABORTED"
   | "RUN_NOT_FOUND"
+  | "INVALID_PARAMS"
   | "INVALID_STATE"
   | "CHANNEL_UNTRUSTED"
   | "BACKEND_ERROR";
@@ -345,9 +468,3 @@ export class ApiError extends Error {
     this.detail = detail;
   }
 }
-
-/* ------------------------------------------------------------------ *
- *  Small shared UI helpers
- * ------------------------------------------------------------------ */
-
-export type IconName = ReactNode;

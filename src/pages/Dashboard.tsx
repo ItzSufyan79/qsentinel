@@ -2,10 +2,14 @@
  * Analytics Dashboard (`/dashboard`) — design report, section 4.5.
  *
  * The cumulative view — this is what turns a one-off demo into "a system."
- * Grid of cards + two charts + the comparison bar, with a filter row.
+ * Four stat cards, the detection-rate table, the mismatch histogram, the
+ * forgery comparison, verifier agreement and the partial-attack analysis.
+ *
+ * The stats endpoints take no filter arguments, so the attack-type control here
+ * filters the rows the backend already returned — it never recomputes a rate.
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { api } from "../api";
 import type {
   ByAttackTypeRow,
@@ -15,9 +19,11 @@ import type {
 } from "../api/types";
 import { ATTACK_OPTIONS } from "../api/types";
 import { useApi } from "../lib/useApi";
+import { pct, probability } from "../lib/formatting";
 import {
   ComparisonBar,
   DataCard,
+  EmptyState,
   Panel,
   SectionHead,
 } from "../components/ui/atoms";
@@ -25,7 +31,6 @@ import { ErrorBanner } from "../components/ui/ErrorBanner";
 
 export function DashboardPage() {
   const [attackFilter, setAttackFilter] = useState("all");
-  const [range, setRange] = useState("all");
 
   const summary = useApi<StatsSummary>(() => api.getStatsSummary(), []);
   const byAttack = useApi<ByAttackTypeRow[]>(() => api.getByAttackType(), []);
@@ -34,9 +39,17 @@ export function DashboardPage() {
 
   const error = summary.error ?? byAttack.error ?? histogram.error ?? forgery.error;
 
+  // view-level filter over backend rows only
+  const visibleRows = useMemo(() => {
+    if (!byAttack.data) return [];
+    return attackFilter === "all"
+      ? byAttack.data
+      : byAttack.data.filter((r) => r.attackType === attackFilter);
+  }, [byAttack.data, attackFilter]);
+
   return (
     <div className="mx-auto max-w-7xl px-6 py-16 md:px-10">
-      <p className="micro text-primary">Cumulative view</p>
+      <p className="micro text-accent-ink">Cumulative view</p>
       <h1 className="mt-2 font-display text-[28px] leading-tight font-semibold text-on-bg">
         Analytics dashboard
       </h1>
@@ -62,18 +75,10 @@ export function DashboardPage() {
             ))}
           </select>
         </label>
-        <label className="flex items-center gap-2">
-          <span className="micro text-n-500">Date range</span>
-          <select
-            value={range}
-            onChange={(e) => setRange(e.target.value)}
-            className="rounded-[var(--qs-r)] border border-outline-strong bg-surface px-3 py-2 text-[13px] text-on-surface"
-          >
-            <option value="all">All time</option>
-            <option value="7d">Last 7 days</option>
-            <option value="30d">Last 30 days</option>
-          </select>
-        </label>
+        <p className="text-[13px] text-n-500">
+          The stats endpoints are cumulative over all logged runs — there is no
+          server-side date range to narrow them to.
+        </p>
       </div>
 
       {/* stat cards */}
@@ -110,26 +115,35 @@ export function DashboardPage() {
         </SectionHead>
         <Panel>
           {byAttack.loading && <div className="skeleton h-40 w-full" />}
-          {byAttack.data && (
+          {byAttack.data && visibleRows.length === 0 && (
+            <EmptyState title="No runs for that attack type">
+              Switch the filter back to “All” to see every scenario the engine
+              has run.
+            </EmptyState>
+          )}
+          {byAttack.data && visibleRows.length > 0 && (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[560px] text-[13px]">
                 <thead>
                   <tr className="border-b border-outline-strong text-left">
                     {["Attack type", "Runs", "Detected", "Detection rate"].map((h) => (
-                      <th key={h} className="display px-3 py-2.5 font-medium tracking-[0.04em] text-n-500 uppercase">
+                      <th
+                        key={h}
+                        className="display px-3 py-2.5 font-medium tracking-[0.04em] text-n-500 uppercase"
+                      >
                         {h}
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {byAttack.data.map((row) => (
+                  {visibleRows.map((row) => (
                     <tr key={row.attackType} className="border-b border-outline last:border-0">
                       <td className="px-3 py-2.5 text-on-surface">{row.label}</td>
                       <td className="num px-3 py-2.5 text-n-600">{row.runs}</td>
                       <td className="num px-3 py-2.5 text-n-600">{row.detected}</td>
                       <td className="px-3 py-2.5">
-                        <span className="num font-semibold text-pass">
+                        <span className="num font-semibold text-pass-ink">
                           {(row.detectionRate * 100).toFixed(0)}%
                         </span>
                       </td>
@@ -150,9 +164,7 @@ export function DashboardPage() {
           </SectionHead>
           <Panel className="p-5">
             {histogram.loading && <div className="skeleton h-40 w-full" />}
-            {histogram.data && (
-              <HistogramChart data={histogram.data} />
-            )}
+            {histogram.data && <HistogramChart data={histogram.data} />}
           </Panel>
         </div>
         <div>
@@ -164,18 +176,78 @@ export function DashboardPage() {
             {forgery.data && (
               <ComparisonBar
                 label="Forgery probability"
-                left={forgery.data.classical}
-                right={forgery.data.quantum}
-                leftLabel={forgery.data.classicalLabel}
-                rightLabel={forgery.data.quantumLabel}
-                format={(v) => (v < 0.001 ? v.toExponential(0) : v.toFixed(2))}
+                unit="probability"
+                rows={[
+                  {
+                    name: forgery.data.classicalLabel,
+                    value: forgery.data.classical,
+                    tone: "primary",
+                  },
+                  { name: forgery.data.quantumLabel, value: forgery.data.quantum, tone: "pass" },
+                ]}
+                format={probability}
               />
             )}
           </Panel>
         </div>
       </div>
 
-      <ErrorBanner error={error} />
+      {/* verifier agreement + partial analysis */}
+      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        <div>
+          <SectionHead step="E" title="Verifier agreement">
+            <span className="micro text-n-500">GET /api/stats/summary</span>
+          </SectionHead>
+          <Panel className="p-5">
+            {summary.data?.verifierAgreementRate === undefined ? (
+              <EmptyState title="Not reported by the backend">
+                The summary endpoint does not include a verifier-agreement rate,
+                so the dashboard leaves the card empty instead of estimating one.
+              </EmptyState>
+            ) : (
+              <div className="space-y-4">
+                <DataCard
+                  label="Runs where every verifier agreed"
+                  value={pct(summary.data.verifierAgreementRate, 1)}
+                  tone="pass"
+                />
+                <p className="text-[14px] leading-relaxed text-on-surface">
+                  When verifiers disagree, the run is marked disputed and routed
+                  to the arbitration view rather than silently taking a
+                  majority.
+                </p>
+              </div>
+            )}
+          </Panel>
+        </div>
+
+        <div>
+          <SectionHead step="F" title="Partial attack analysis">
+            <span className="micro text-n-500">attack size vs. detection</span>
+          </SectionHead>
+          <Panel className="p-5">
+            <EmptyState title="Data unavailable">
+              Detection rate as a function of attack fraction needs a
+              per-run attack-fraction field. The contract does not expose one
+              yet, so this panel stays empty instead of showing a curve that
+              was never computed.
+            </EmptyState>
+            <div className="mt-4">
+              <p className="micro text-n-500">What the log already shows</p>
+              <p className="mt-1.5 text-[14px] leading-relaxed text-on-surface">
+                Partial attacks are the only scenario in the table above with a
+                detection rate well under 100% — small perturbations can stay
+                under the threshold. Every individual partial run and its
+                measured mismatch is on the event log.
+              </p>
+            </div>
+          </Panel>
+        </div>
+      </div>
+
+      <div className="mt-8">
+        <ErrorBanner error={error} />
+      </div>
     </div>
   );
 }
@@ -200,7 +272,7 @@ function HistogramChart({ data }: { data: HistogramResponse }) {
                 title={`attacked: ${data.attacked[i]}`}
               />
             </div>
-            <span className="num text-center text-[10px] text-n-500">{bin}</span>
+            <span className="num text-center text-[12px] leading-tight text-n-500">{bin}</span>
           </div>
         ))}
       </div>

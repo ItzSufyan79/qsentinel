@@ -14,14 +14,16 @@ distribution against the expected one, applies a threshold, and decides.
 ## Pages
 
 Six top-level pages with a persistent nav bar, plus one hidden page reachable
-only from a disputed verdict.
+only from a disputed verdict. Every page is a real route: any URL can be opened,
+reloaded, or linked to directly.
 
 | Route | Page | Data |
 | --- | --- | --- |
 | `/` | Overview | `GET /api/stats/forgery-comparison` |
 | `/simulate/new` | New Simulation | `GET /api/simulate/preview`, `POST /api/simulate/run` |
 | `/simulate/run/:runId` | Live Simulation | `GET .../keygen`, `.../distribution`, `.../signing`, `.../verification` |
-| `/simulate/run/:runId/result` | Results | `GET .../result` || `/simulate/run/:runId/arbitration` | Arbitration *(hidden)* | `GET .../arbitration` |
+| `/simulate/run/:runId/result` | Results | `GET .../result` |
+| `/simulate/run/:runId/arbitration` | Arbitration *(hidden)* | `GET .../arbitration` |
 | `/dashboard` | Analytics Dashboard | `GET /api/stats/summary`, `.../by-attack-type`, `.../histogram`, `.../forgery-comparison` |
 | `/log` | Event Log | `GET /api/log`, `GET /api/log/export` |
 
@@ -48,9 +50,10 @@ Four colours, fixed roles — a fifth is never introduced:
 The copper and sage fills are mid-tones, so text usages deepen them
 (`--qs-accent-ink`, `--qs-pass-ink`) to clear WCAG AA on the cream surface.
 
-**Type:** Fontshare — Clash Display (display/headings), General Sans (body/UI),
-Nippo (data/monospace). Three visually distinct families, so display, body and
-data never read as the same face. **Scale:** 28 / 20 / 16 / 14 / 13 / 12px —
+**Type:** IBM Plex — Sans (body/UI), Sans Condensed (display/headings), Mono
+(data/labels). Self-hosted through `@fontsource`, so there is no third-party
+font CDN. Three visually distinct faces, so display, body and data never read as
+the same one. **Scale:** 28 / 20 / 16 / 14 / 13 / 12px —
 never below 12px. **Icons:** Tabler outline, on a fixed concept mapping. No
 emoji anywhere.
 
@@ -93,24 +96,26 @@ See `.env.example`.
 | `npm run preview` | serve the production build |
 | `npm run lint` | oxlint |
 | `npm run smoke` | headless run of all contract assertions |
-| `npm run audit` | headless Chrome layout/contrast audit of `/` |
+| `npm run audit` | headless Chrome layout/contrast audit of every route |
 
-`npm run smoke` drives the whole flow against the mock — attack catalogue, run
-creation, every live-simulation phase, the streamed verification, the result,
-arbitration, analytics and the event log — plus the HTTP failure path against
-a dead port. 44 checks.
+`npm run smoke` drives the whole flow against the mock — all nine attack
+scenarios, run creation, every live-simulation phase, the streamed
+verification, the result, threshold overrides, arbitration, analytics and the
+filtered event log — plus the HTTP failure path against a dead port
+(160 contract checks, then the failure-path suite).
 
-`npm run audit` needs a running `npm run preview`. It checks horizontal
-overflow, clipped text, sub-12px type, and WCAG AA contrast at 1440 / 834 /
-390. Add `-- --dark` for dark mode. Screenshots land in `.audit/` (gitignored).
+`npm run audit` needs a running `npm run preview`. It creates a collusion run,
+then walks all seven routes at 1440 / 834 / 390 checking horizontal overflow,
+clipped text, sub-12px type, and WCAG AA contrast. Add `-- --dark` for dark
+mode. Screenshots land in `.audit/` (gitignored).
 
 ## Stack
 
 React 19 · TypeScript · Vite 8 · Tailwind CSS v4 · react-router 7 · animejs ·
-Tabler Icons · Fontshare (Clash Display, General Sans, Nippo) · oxlint
+Tabler Icons · IBM Plex (Sans, Sans Condensed, Mono) · oxlint
 
 No chart library. Every visualisation is hand-written SVG and every transition
-is CSS or anime.js, which keeps the bundle at ~113 kB gzipped and makes the
+is CSS or anime.js, which keeps the bundle at ~123 kB gzipped and makes the
 interface render identically under `prefers-reduced-motion`.
 
 ## Licence

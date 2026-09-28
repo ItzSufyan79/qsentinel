@@ -37,7 +37,7 @@ export function SeverityGauge({ score }: { score: number }) {
     return () => {
       anim.cancel();
     };
-  }, [offset]);
+  }, [offset, circumference]);
 
   return (
     <div className="flex flex-col items-center">

@@ -10,6 +10,9 @@ export function useApi<T>(fn: () => Promise<T>, deps: readonly unknown[]) {
   const [error, setError] = useState<ApiError | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // The caller owns the dependency list (see the `deps` argument), so the
+  // linter cannot verify stability of `fn` and flags the reset below.
+  // oxlint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -33,7 +36,7 @@ export function useApi<T>(fn: () => Promise<T>, deps: readonly unknown[]) {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
   return { data, error, loading };

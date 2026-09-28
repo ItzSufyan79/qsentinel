@@ -20,6 +20,11 @@ const COPY: Record<ApiErrorCode, { title: string; advice: string }> = {
     advice:
       "This run id is unknown to the backend. It may have expired, or the link is wrong.",
   },
+  INVALID_PARAMS: {
+    title: "Configuration rejected",
+    advice:
+      "The backend rejected the simulation parameters — they are outside the range it supports. Adjust the sliders and try again.",
+  },
   INVALID_STATE: {
     title: "Invalid state",
     advice:
@@ -48,7 +53,7 @@ export function ErrorBanner({ error }: { error: ApiError | null }) {
       role="alert"
       className="mb-4 rounded-[var(--qs-r)] border border-fail bg-fail-tint p-4"
     >
-      <p className="display text-[13px] font-semibold tracking-[0.04em] text-fail uppercase">
+      <p className="display text-[13px] font-semibold tracking-[0.04em] text-fail-ink uppercase">
         {copy.title}
       </p>
       <p className="mt-1 text-[14px] leading-relaxed text-on-surface">{copy.advice}</p>

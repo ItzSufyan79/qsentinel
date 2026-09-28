@@ -1,11 +1,12 @@
 /**
  * QuantumChannel — a live, animated channel between two nodes.
  *
- * Photons (dots) flow continuously along the wire. When an attack interposes
- * on the channel, an attacker node appears mid-wire and pulses, which is the
- * visual answer to "how does the attack physically happen".
+ * Photons (dots) flow continuously along the wire. When an attack interposes on
+ * the quantum channel, an attacker node appears mid-wire and pulses, which is
+ * the visual answer to "how does the attack physically happen".
  *
- * The particle flow is driven by anime.js with a staggered loop.
+ * `attacking` comes from the signing endpoint, never from the attack type, so
+ * a replay or a classical-tampering run correctly shows a clean channel.
  */
 
 import { useEffect, useRef } from "react";
@@ -27,7 +28,7 @@ function Node({
         className={`grid size-10 place-items-center rounded-full border ${
           tone === "brand"
             ? "border-primary bg-primary text-on-primary"
-            : "border-pass bg-pass-tint text-pass"
+            : "border-pass bg-pass-tint text-pass-ink"
         }`}
       >
         <Icon name={icon} size={18} />
@@ -39,22 +40,31 @@ function Node({
   );
 }
 
-export function QuantumChannel({ attacking }: { attacking: boolean }) {
-  const dotRefs = useRef<(HTMLSpanElement | null)[]>([]);
+export function QuantumChannel({
+  attacking,
+  caption,
+}: {
+  attacking: boolean;
+  caption?: string;
+}) {
+  const wireRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const dots = dotRefs.current.filter((d): d is HTMLSpanElement => d !== null);
-    const anims = dots.map((dot) =>
-      animate(dot, {
-        left: ["0%", "100%"],
-        duration: 2200,
-        delay: stagger(360),
-        loop: true,
-        ease: "linear",
-      }),
-    );
+    const wire = wireRef.current;
+    if (!wire) return;
+    const photons = [...wire.querySelectorAll<HTMLElement>("[data-photon]")];
+    if (photons.length === 0) return;
+
+    // one animation over all photons so the stagger actually staggers
+    const anim = animate(photons, {
+      left: ["0%", "100%"],
+      duration: 2400,
+      delay: stagger(400),
+      loop: true,
+      ease: "linear",
+    });
     return () => {
-      anims.forEach((a) => a.cancel());
+      anim.cancel();
     };
   }, []);
 
@@ -65,7 +75,7 @@ export function QuantumChannel({ attacking }: { attacking: boolean }) {
         <Node label="Verifier" icon="eye" tone="pass" />
       </div>
 
-      <div className="relative mt-2 h-8">
+      <div ref={wireRef} className="relative mt-3 h-10">
         {/* the wire */}
         <div className="absolute top-1/2 right-0 left-0 h-px -translate-y-1/2 bg-outline-strong" />
 
@@ -73,10 +83,10 @@ export function QuantumChannel({ attacking }: { attacking: boolean }) {
         {Array.from({ length: 6 }).map((_, i) => (
           <span
             key={i}
-            ref={(el) => {
-              dotRefs.current[i] = el;
-            }}
-            className="absolute top-1/2 size-2 -translate-y-1/2 rounded-full bg-primary"
+            data-photon
+            className={`absolute top-1/2 size-2 -translate-y-1/2 rounded-full ${
+              attacking ? "bg-fail" : "bg-primary"
+            }`}
             style={{ left: 0 }}
           />
         ))}
@@ -86,16 +96,16 @@ export function QuantumChannel({ attacking }: { attacking: boolean }) {
           <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
             <span className="relative grid size-9 place-items-center rounded-full border border-fail bg-fail-tint text-fail">
               <Icon name="alert-triangle" size={16} />
-              <span className="absolute inset-0 animate-ping rounded-full border border-fail" />
             </span>
           </span>
         )}
       </div>
 
-      <p className="micro mt-1 text-center text-n-500">
-        {attacking
-          ? "an attacker is interposed on the channel"
-          : "photons flowing signer → verifier"}
+      <p className="mt-2 text-center text-[13px] leading-relaxed text-n-500">
+        {caption ??
+          (attacking
+            ? "An attacker is interposed on the quantum channel."
+            : "Photons flowing signer → verifier, channel clean.")}
       </p>
     </div>
   );

@@ -7,6 +7,7 @@
 
 import type {
   ActiveResponse,
+  ApiErrorCode,
   ArbitrationResponse,
   AttackTypeId,
   ByAttackTypeRow,
@@ -15,6 +16,7 @@ import type {
   HistogramResponse,
   KeygenResponse,
   LogPage,
+  LogQuery,
   PreviewResponse,
   ResultResponse,
   RunResponse,
@@ -30,6 +32,24 @@ import { env } from "./env";
 /** Read per request so the failure-path test can point at different hosts. */
 const BASE = () => env("VITE_API_URL") ?? "http://127.0.0.1:8000";
 const TIMEOUT = () => Number(env("VITE_API_TIMEOUT") ?? 15000);
+
+/** Serialises the log query, omitting refinements that are not set. */
+function logQuery(page: number, filter: string, extra?: LogQuery): string {
+  const q = new URLSearchParams({ page: String(page), filter });
+  if (extra?.verdict && extra.verdict !== "all") q.set("verdict", extra.verdict);
+  if (extra?.date) q.set("date", extra.date);
+  if (extra?.search) q.set("search", extra.search);
+  return q.toString();
+}
+
+/** Maps an HTTP status onto the error codes the UI knows how to explain. */
+function statusToCode(status: number): ApiErrorCode {
+  if (status === 404) return "RUN_NOT_FOUND";
+  if (status === 400 || status === 422) return "INVALID_PARAMS";
+  if (status === 409) return "CHANNEL_UNTRUSTED";
+  if (status === 412) return "INVALID_STATE";
+  return "BACKEND_ERROR";
+}
 
 async function request<T>(
   path: string,
@@ -51,7 +71,7 @@ async function request<T>(
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       throw new ApiError(
-        res.status === 404 ? "RUN_NOT_FOUND" : res.status === 409 ? "CHANNEL_UNTRUSTED" : "BACKEND_ERROR",
+        statusToCode(res.status),
         body || `Request failed with ${res.status}`,
         res.status,
       );
@@ -78,16 +98,36 @@ const post = <T>(path: string, body: unknown, ctx?: RunContext) =>
 export const httpApi: QdsApi = {
   getActive: (ctx) => get<ActiveResponse>(ROUTES.active, ctx),
 
-  preview: (attack, n, threshold, ctx) =>
+  preview: (params, ctx) =>
     get<PreviewResponse>(
-      `${ROUTES.preview}?attack=${attack}&n=${n}&threshold=${threshold}`,
+      `${ROUTES.preview}?${new URLSearchParams({
+        attack: params.attackType,
+        noise: String(params.noise),
+        n: String(params.qubitsPerSlot),
+        verifier_count: String(params.verifierCount),
+        ...(params.attackFraction !== undefined
+          ? { attack_fraction: String(params.attackFraction) }
+          : {}),
+      })}`,
       ctx,
     ),
 
-  createRun: (attack, n, threshold, verifierCount, ctx) =>
+  createRun: (params, ctx) =>
     post<RunResponse>(
       ROUTES.run,
-      { attack, n, threshold, verifierCount },
+      {
+        attack_type: params.attackType,
+        noise: params.noise,
+        qubits_per_slot: params.qubitsPerSlot,
+        verifier_count: params.verifierCount,
+        ...(params.attackFraction !== undefined
+          ? { attack_fraction: params.attackFraction }
+          : {}),
+        // only sent when the user actually overrode the derived threshold
+        ...(params.thresholdOverride !== undefined
+          ? { threshold: params.thresholdOverride }
+          : {}),
+      },
       ctx,
     ),
 
@@ -173,16 +213,35 @@ export const httpApi: QdsApi = {
 
   getForgeryComparison: (ctx) => get<ForgeryComparison>(ROUTES.statsForgeryComparison, ctx),
 
-  getLog: (page, filter, ctx) =>
-    get<LogPage>(`${ROUTES.log}?page=${page}&filter=${encodeURIComponent(filter)}`, ctx),
+  getLog: (page, filter, extra, ctx) =>
+    get<LogPage>(`${ROUTES.log}?${logQuery(page, filter, extra)}`, ctx),
 
-  async exportLog(filter, ctx: RunContext = {}) {
-    const res = await fetch(
-      `${ROUTES.logExport}?filter=${encodeURIComponent(filter)}`,
-      { signal: ctx.signal },
-    );
-    if (!res.ok) throw new ApiError("BACKEND_ERROR", `Export failed with ${res.status}`, res.status);
-    return res.blob();
+  async exportLog(filter, extra, ctx: RunContext = {}): Promise<Blob> {
+    const controller = new AbortController();
+    const onAbort = () => controller.abort();
+    ctx.signal?.addEventListener("abort", onAbort);
+    const timer = setTimeout(() => controller.abort(), TIMEOUT());
+    try {
+      const res = await fetch(
+        `${BASE()}${ROUTES.logExport}?${logQuery(1, filter, extra)}`,
+        { signal: controller.signal },
+      );
+      if (!res.ok) {
+        throw new ApiError("BACKEND_ERROR", `Export failed with ${res.status}`, res.status);
+      }
+      return await res.blob();
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      if (controller.signal.aborted) {
+        throw ctx.signal?.aborted
+          ? new ApiError("ABORTED", "Cancelled")
+          : new ApiError("TIMEOUT", "Export timed out");
+      }
+      throw new ApiError("NETWORK", err instanceof Error ? err.message : "Network error");
+    } finally {
+      clearTimeout(timer);
+      ctx.signal?.removeEventListener("abort", onAbort);
+    }
   },
 };
 

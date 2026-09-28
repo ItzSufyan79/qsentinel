@@ -10,7 +10,8 @@
     "smoke": "tsx scripts/smoke.ts && VITE_API_MODE=http VITE_API_URL=http://127.0.0.1:1 tsx scripts/smoke-fail.ts",
     "preview": "vite preview",
     "smoke:fail": "VITE_API_MODE=http VITE_API_URL=http://127.0.0.1:1 tsx scripts/smoke-fail.ts",
-    "audit": "tsx scripts/audit.ts"
+    "audit": "tsx scripts/audit.ts",
+    "og": "tsx scripts/og.ts"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",

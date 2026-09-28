@@ -16,18 +16,18 @@ import type {
   ActiveResponse,
   ApiErrorCode,
   ArbitrationResponse,
-  AttackTypeId,
   ByAttackTypeRow,
   DistributionResponse,
   ForgeryComparison,
   HistogramResponse,
-  InitResponse,
   KeygenResponse,
   LogPage,
+  LogQuery,
   PreviewResponse,
   ResultResponse,
   RunResponse,
   SignResponse,
+  SimulationParameters,
   StatsSummary,
   VerifyEvent,
   VerifierResult,
@@ -53,20 +53,19 @@ export interface QdsApi {
   /** GET /api/simulate/active — polled by the global nav badge. */
   getActive(ctx?: RunContext): Promise<ActiveResponse>;
 
-  /** GET /api/simulate/preview — predicted confidence at a given N. */
+  /**
+   * GET /api/simulate/preview — the backend-derived threshold and valid ranges
+   * for a configuration. Optional by contract: a 404 means the endpoint is not
+   * implemented, and the UI then shows backend-derived data as unavailable.
+   */
   preview(
-    attack: AttackTypeId,
-    n: number,
-    threshold: number,
+    params: SimulationParameters,
     ctx?: RunContext,
   ): Promise<PreviewResponse>;
 
   /** POST /api/simulate/run — create a run, returns its id. */
   createRun(
-    attack: AttackTypeId,
-    n: number,
-    threshold: number,
-    verifierCount: number,
+    params: SimulationParameters,
     ctx?: RunContext,
   ): Promise<RunResponse>;
 
@@ -115,11 +114,22 @@ export interface QdsApi {
 
   /* ---- event log ------------------------------------------------- */
 
-  /** GET /api/log?page=&filter= */
-  getLog(page: number, filter: string, ctx?: RunContext): Promise<LogPage>;
+  /**
+   * GET /api/log?page=&filter=&verdict=&date=&search=
+   *
+   * `filter` is an attack type id or "all". The three optional refinements are
+   * sent only when set; a backend that does not implement them simply returns
+   * the unfiltered page, which is why the log view labels what it filtered.
+   */
+  getLog(
+    page: number,
+    filter: string,
+    extra?: LogQuery,
+    ctx?: RunContext,
+  ): Promise<LogPage>;
 
   /** GET /api/log/export — CSV of the current filtered view. */
-  exportLog(filter: string, ctx?: RunContext): Promise<Blob>;
+  exportLog(filter: string, extra?: LogQuery, ctx?: RunContext): Promise<Blob>;
 }
 
 /* ------------------------------------------------------------------ *
@@ -143,5 +153,3 @@ export const ROUTES = {
   log: "/api/log",
   logExport: "/api/log/export",
 } as const;
-
-export type { InitResponse };

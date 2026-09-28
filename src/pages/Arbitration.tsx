@@ -2,8 +2,9 @@
  * Arbitration (`/simulate/run/:run_id/arbitration`) — design report, section 4.7.
  *
  * The verifier-vs-verifier case. Only reachable from a disputed Results page.
- * Two VerifierPanels side by side (V1 / V2), each showing their independent
- * verdict, then a single reconciliation panel.
+ * One VerifierPanel per configured verifier, then the cross-check and the
+ * arbiter's ruling. The panel count follows the run's verifier count, so a
+ * three-verifier run shows three panels.
  */
 
 import { Link } from "react-router-dom";
@@ -19,7 +20,7 @@ import {
 } from "../components/ui/atoms";
 import { Icon } from "../components/ui/atoms";
 import { ErrorBanner } from "../components/ui/ErrorBanner";
-import { useRunId } from "../App";
+import { useRunId } from "../lib/useRunId";
 
 export function ArbitrationPage() {
   const runId = useRunId();
@@ -27,6 +28,7 @@ export function ArbitrationPage() {
     () => api.getArbitration(runId),
     [runId],
   );
+  const count = data?.verifiers.length ?? 0;
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-16 md:px-10">
@@ -35,16 +37,23 @@ export function ArbitrationPage() {
           <Icon name="scale" size={18} />
         </span>
         <div>
-          <p className="micro text-primary">Dispute resolution</p>
+          <p className="micro text-accent-ink">Dispute resolution</p>
           <h1 className="font-display text-[28px] leading-tight font-semibold text-on-bg">
             Arbitration
           </h1>
         </div>
       </div>
       <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-n-600">
-        Two verifiers reported conflicting outcomes. Each panel shows their
-        independent verdict; the reconciliation below rules on which report was
-        inconsistent, without exposing raw key material.
+        {count > 0 ? (
+          <>
+            {count} verifier{count === 1 ? "" : "s"} reported conflicting
+            outcomes. Each panel shows their independent verdict; the
+            reconciliation below rules on which report was inconsistent, without
+            exposing raw key material.
+          </>
+        ) : (
+          "Each panel below shows an independent verdict; the reconciliation rules on which report was inconsistent, without exposing raw key material."
+        )}
       </p>
 
       <div className="mt-6">
@@ -52,7 +61,11 @@ export function ArbitrationPage() {
         {error && <ErrorBanner error={error} />}
         {data && (
           <div className="animate-fade-up space-y-6">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div
+              className={`grid gap-4 ${
+                count > 2 ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2"
+              }`}
+            >
               {data.verifiers.map((v, i) => (
                 <VerifierPanel
                   key={v.name}
@@ -74,7 +87,7 @@ export function ArbitrationPage() {
               >
                 <span className="micro text-n-500">cross_check_status</span>
               </SectionHead>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <StatusBadge
                   tone={data.crossCheckStatus === "diverged" ? "disputed" : "honest"}
                 >
@@ -82,8 +95,8 @@ export function ArbitrationPage() {
                 </StatusBadge>
                 <p className="text-[14px] text-n-600">
                   {data.crossCheckStatus === "diverged"
-                    ? "V1 and V2's cross-check comparison diverged."
-                    : "V1 and V2's cross-check comparison matched."}
+                    ? `The cross-check between the ${count} verifiers diverged — their reports do not sit in the same band.`
+                    : `The cross-check between the ${count} verifiers matched.`}
                 </p>
               </div>
             </Panel>
@@ -109,8 +122,8 @@ export function ArbitrationPage() {
             <Banner tone="neutral" title="Why this page is hidden">
               <p>
                 Arbitration is not in the top nav. It only appears when a verdict
-                is disputed, so the nav stays uncluttered for the 95% of runs that
-                never need it.
+                is disputed, so the nav stays uncluttered for the runs that never
+                need it.
               </p>
             </Banner>
           </div>

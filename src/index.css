@@ -26,11 +26,14 @@
 
   /* brand hue as *foreground*. The copper fill is a mid-tone that fails AA as
      text on the cream surface, so it is deepened for text usage. */
-  --qs-accent-ink: #8f6143;
+  --qs-accent-ink: #805539;
   /* pass green is a fill; its foreground flips light/dark with the theme */
   --qs-on-pass: #2a241e;
   /* pass text on the light pass-tint chip — a darker sage that clears AA */
   --qs-pass-ink: #5f6b52;
+  /* alert text: the locked #A8493A already clears AA on cream, and dark mode
+     lifts it because the same tone does not clear AA on a dark surface */
+  --qs-fail-ink: #a8493a;
 
   /* surfaces */
   --qs-bg: #f6efe7;
@@ -122,6 +125,7 @@
   --qs-accent-ink: #d09a7a;
   --qs-on-pass: #221d18;
   --qs-pass-ink: #a8b89a;
+  --qs-fail-ink: #dc7a5f;
 
   --qs-on-primary: #2a241e;
   --qs-on-secondary: #221d18;
@@ -162,14 +166,21 @@
   --color-ink-soft: var(--qs-ink-soft);
 
   --color-pass: var(--qs-pass);
+  --color-pass-ink: var(--qs-pass-ink);
+  --color-pass-tint: var(--qs-pass-tint);
+  --color-on-pass: var(--qs-on-pass);
   --color-fail: var(--qs-fail);
+  --color-fail-ink: var(--qs-fail-ink);
+  --color-fail-tint: var(--qs-fail-tint);
   --color-warn: var(--qs-warn);
+  --color-warn-tint: var(--qs-warn-tint);
   --color-pending: var(--qs-pending);
+  --color-pending-tint: var(--qs-pending-tint);
 
-  /* Fonts: Fontshare — Clash Display (display), General Sans (body), Nippo (data) */
-  --font-sans: "General Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Nippo", ui-monospace, "SF Mono", Menlo, monospace;
-  --font-display: "Clash Display", "General Sans", ui-sans-serif, sans-serif;
+  /* Fonts: IBM Plex — Sans (body/UI), Sans Condensed (display), Mono (data) */
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-display: "IBM Plex Sans Condensed", "IBM Plex Sans", ui-sans-serif, sans-serif;
 
   --ease-flow: var(--ease-out);
 }
@@ -271,6 +282,9 @@
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--qs-n-500);
+    /* endpoint paths and metric keys are single long tokens — let them break
+       instead of pushing a section band past a phone viewport */
+    overflow-wrap: anywhere;
   }
 
   .num {
@@ -284,6 +298,7 @@
 
   .section-band {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.75rem;
     padding: 0.5rem 0 0.55rem;

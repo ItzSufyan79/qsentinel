@@ -16,34 +16,36 @@
  * No decorative icons. If a concept has no mapping, it gets no icon.
  */
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { animate } from "animejs";
 import {
   IconActivity,
   IconAlertTriangle,
+  IconArrowRight,
   IconAtom,
   IconChartBar,
+  IconCircleCheck,
+  IconClock,
+  IconCpu,
+  IconDownload,
   IconEye,
+  IconFlask,
   IconListDetails,
   IconLock,
   IconScale,
+  IconSearch,
   IconShieldCheck,
 } from "@tabler/icons-react";
+import type { IconName } from "../../lib/iconNames";
+import { mechanismLabel } from "../../lib/formatting";
+import { PHASES, type PhaseId } from "../../lib/phases";
+import type { DetectionMechanism } from "../../api/types";
+
+export type { IconName };
 
 /* ------------------------------------------------------------------ */
 /*  Icon — the fixed concept mapping                                    */
 /* ------------------------------------------------------------------ */
-
-export type IconName =
-  | "atom"
-  | "lock"
-  | "shield-check"
-  | "alert-triangle"
-  | "eye"
-  | "scale"
-  | "activity"
-  | "chart-bar"
-  | "list-details";
 
 const ICONS: Record<IconName, (p: { size?: number; className?: string }) => ReactNode> = {
   atom: (p) => <IconAtom {...p} />,
@@ -55,6 +57,13 @@ const ICONS: Record<IconName, (p: { size?: number; className?: string }) => Reac
   activity: (p) => <IconActivity {...p} />,
   "chart-bar": (p) => <IconChartBar {...p} />,
   "list-details": (p) => <IconListDetails {...p} />,
+  search: (p) => <IconSearch {...p} />,
+  flask: (p) => <IconFlask {...p} />,
+  clock: (p) => <IconClock {...p} />,
+  download: (p) => <IconDownload {...p} />,
+  "arrow-right": (p) => <IconArrowRight {...p} />,
+  "circle-check": (p) => <IconCircleCheck {...p} />,
+  cpu: (p) => <IconCpu {...p} />,
 };
 
 export function Icon({
@@ -217,15 +226,7 @@ export function Banner({
 /*  Verification → Result                                              */
 /* ------------------------------------------------------------------ */
 
-export const PHASES = [
-  { id: "keygen", label: "Key Gen" },
-  { id: "distribution", label: "Distribution" },
-  { id: "signing", label: "Signing" },
-  { id: "verification", label: "Verification" },
-  { id: "result", label: "Result" },
-] as const;
 
-export type PhaseId = (typeof PHASES)[number]["id"];
 
 export function PhaseStepper({
   current,
@@ -242,10 +243,13 @@ export function PhaseStepper({
         const state =
           i < maxIdx ? "done" : i === currentIdx ? "active" : "pending";
         return (
-          <li key={phase.id} className="flex flex-1 items-start">
-            <div className="flex flex-col items-center gap-2">
+          <li key={phase.id} className="flex min-w-0 flex-1 items-start" aria-label={phase.label}>
+            <div
+              className="flex min-w-0 flex-col items-center gap-2"
+              aria-current={i === currentIdx ? "step" : undefined}
+            >
               <span
-                className={`grid size-7 place-items-center rounded-[var(--qs-r-sm)] border font-mono text-[12px] font-semibold ${
+                className={`grid size-7 shrink-0 place-items-center rounded-[var(--qs-r-sm)] border font-mono text-[12px] font-semibold ${
                   state === "done"
                     ? "border-pass bg-pass text-on-pass"
                     : state === "active"
@@ -255,8 +259,10 @@ export function PhaseStepper({
               >
                 {state === "done" ? <Icon name="shield-check" size={14} /> : i + 1}
               </span>
+              {/* the labels do not fit five-across on a phone; the stepper's
+                  aria-label and the live status line carry the same words */}
               <span
-                className={`display text-center text-[12px] tracking-[0.04em] uppercase ${
+                className={`display hidden text-center text-[12px] tracking-[0.04em] uppercase sm:block ${
                   state === "active"
                     ? "font-semibold text-on-bg"
                     : state === "done"
@@ -270,7 +276,7 @@ export function PhaseStepper({
             {i < PHASES.length - 1 && (
               <span
                 aria-hidden
-                className={`mx-2 mt-3.5 h-px flex-1 ${
+                className={`mx-1 mt-3.5 h-px flex-1 sm:mx-2 ${
                   i < maxIdx ? "bg-pass" : "bg-outline"
                 }`}
               />
@@ -304,7 +310,7 @@ export function DataCard({
     tone === "pass"
       ? "text-pass-ink"
       : tone === "fail"
-        ? "text-fail"
+        ? "text-fail-ink"
         : tone === "brand"
           ? "text-accent-ink"
           : "text-on-bg";
@@ -354,7 +360,8 @@ function CountUp({ value }: { value: number }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  ParamSlider — labelled slider with live numeric readout             */
+/*  ParamSlider — labelled slider with live numeric readout. `min`,      */
+/*  `max` and `step` come from the backend, never from this file.        */
 /* ------------------------------------------------------------------ */
 
 export function ParamSlider({
@@ -367,6 +374,8 @@ export function ParamSlider({
   onChange,
   disabled = false,
   hint,
+  error,
+  format = (v: number) => String(v),
 }: {
   label: string;
   value: number;
@@ -377,19 +386,27 @@ export function ParamSlider({
   onChange: (v: number) => void;
   disabled?: boolean;
   hint?: string;
+  error?: string;
+  format?: (v: number) => string;
 }) {
+  const id = useId();
+  const hintId = `${id}-hint`;
   return (
     <div>
       <div className="flex items-baseline justify-between gap-3">
-        <label className="display text-[13px] font-medium tracking-[0.04em] text-on-surface uppercase">
+        <label
+          htmlFor={id}
+          className="display text-[13px] font-medium tracking-[0.04em] text-on-surface uppercase"
+        >
           {label}
         </label>
         <span className="num text-[14px] font-semibold text-on-bg">
-          {value}
+          {format(value)}
           {unit}
         </span>
       </div>
       <input
+        id={id}
         type="range"
         min={min}
         max={max}
@@ -397,90 +414,217 @@ export function ParamSlider({
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
+        aria-describedby={hint || error ? hintId : undefined}
+        aria-invalid={error ? true : undefined}
         className="mt-2 h-1.5 w-full cursor-pointer appearance-none rounded-full bg-n-200 accent-[var(--qs-primary)] disabled:cursor-not-allowed disabled:opacity-40"
-        aria-label={label}
       />
-      {hint && <p className="mt-1.5 text-[13px] text-n-500">{hint}</p>}
+      <div className="mt-1.5 flex items-baseline justify-between gap-3">
+        <span className="num text-[12px] text-n-500">
+          {format(min)}
+          {unit}
+        </span>
+        <span className="num text-[12px] text-n-500">
+          {format(max)}
+          {unit}
+        </span>
+      </div>
+      {(hint || error) && (
+        <p
+          id={hintId}
+          className={`mt-1.5 text-[13px] ${error ? "text-fail-ink" : "text-n-500"}`}
+        >
+          {error ?? hint}
+        </p>
+      )}
     </div>
   );
 }
 
+/** Verifier count is a small discrete choice, so it gets buttons not a slider. */
+export function CountStepper({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+  disabled = false,
+  hint,
+  error,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (v: number) => void;
+  disabled?: boolean;
+  hint?: string;
+  error?: string;
+}) {
+  const hintId = useId();
+  return (
+    <fieldset disabled={disabled}>
+      <legend className="display text-[13px] font-medium tracking-[0.04em] text-on-surface uppercase">
+        {label}
+      </legend>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5" aria-describedby={hintId}>
+        {Array.from({ length: max - min + 1 }, (_, i) => min + i).map((n) => {
+          const active = n === value;
+          return (
+            <button
+              key={n}
+              type="button"
+              onClick={() => onChange(n)}
+              aria-pressed={active}
+              aria-label={`${n} verifier${n === 1 ? "" : "s"}`}
+              className={`num size-9 rounded-[var(--qs-r)] border text-[14px] font-semibold transition-colors ${
+                active
+                  ? "border-primary bg-primary text-on-primary"
+                  : "border-outline-strong bg-surface text-n-600 hover:border-outline-strong hover:text-on-bg"
+              }`}
+            >
+              {n}
+            </button>
+          );
+        })}
+        <span className="num ml-1 text-[12px] text-n-500">
+          {value} selected
+        </span>
+      </div>
+      {(hint || error) && (
+        <p id={hintId} className={`mt-1.5 text-[13px] ${error ? "text-fail-ink" : "text-n-500"}`}>
+          {error ?? hint}
+        </p>
+      )}
+    </fieldset>
+  );
+}
+
 /* ------------------------------------------------------------------ */
-/*  ComparisonBar — two-bar horizontal comparison, fixed violet/teal   */
+/*  ComparisonBar — n-bar comparison. Every value is backend-supplied;    */
+/*  the optional marker is the backend-derived threshold.                */
 /* ------------------------------------------------------------------ */
+
+export interface ComparisonRow {
+  name: string;
+  value: number;
+  /** "primary" for the first series, "secondary" for the comparison, "pass" for a good outcome, "fail" for a bad one */
+  tone?: "primary" | "secondary" | "pass" | "fail";
+}
+
+const ROW_TONE: Record<NonNullable<ComparisonRow["tone"]>, { bar: string; text: string }> = {
+  primary: { bar: "var(--qs-primary)", text: "text-accent-ink" },
+  secondary: { bar: "var(--qs-secondary)", text: "text-pass-ink" },
+  pass: { bar: "var(--qs-pass)", text: "text-pass-ink" },
+  fail: { bar: "var(--qs-fail)", text: "text-fail-ink" },
+};
 
 export function ComparisonBar({
   label,
-  left,
-  right,
-  leftLabel,
-  rightLabel,
+  rows,
   format = (v: number) => v.toFixed(3),
+  unit,
+  marker,
 }: {
   label: string;
-  left: number;
-  right: number;
-  leftLabel: string;
-  rightLabel: string;
+  rows: ComparisonRow[];
   format?: (v: number) => string;
+  unit?: string;
+  /** a reference line, e.g. the detection threshold */
+  marker?: { value: number; label: string };
 }) {
-  const max = Math.max(left, right, 1e-12);
+  const max = Math.max(...rows.map((r) => r.value), marker?.value ?? 0, 1e-12);
   return (
-    <div>
-      <p className="display mb-2 text-[13px] font-medium tracking-[0.04em] text-on-surface uppercase">
+    <figure>
+      <figcaption className="display mb-2 text-[13px] font-medium tracking-[0.04em] text-on-surface uppercase">
         {label}
-      </p>
+        {unit ? <span className="ml-1 normal-case text-n-500">({unit})</span> : null}
+      </figcaption>
       <div className="space-y-2.5">
-        {[
-          { v: left, name: leftLabel, bar: "var(--qs-primary)", text: "text-accent-ink" },
-          { v: right, name: rightLabel, bar: "var(--qs-secondary)", text: "text-pass-ink" },
-        ].map((row) => (
-          <div key={row.name}>
-            <div className="mb-1 flex items-baseline justify-between gap-2">
-              <span className="text-[13px] text-n-600">{row.name}</span>
-              <span className={`num text-[13px] font-semibold ${row.text}`}>
-                {format(row.v)}
-              </span>
+        {rows.map((row) => {
+          const tone = ROW_TONE[row.tone ?? "primary"];
+          return (
+            <div key={row.name}>
+              <div className="mb-1 flex items-baseline justify-between gap-2">
+                <span className="text-[13px] text-n-600">{row.name}</span>
+                <span className={`num text-[13px] font-semibold ${tone.text}`}>
+                  {format(row.value)}
+                </span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-n-200">
+                <div
+                  className="h-full rounded-full transition-[width] duration-500"
+                  style={{ width: `${(row.value / max) * 100}%`, background: tone.bar }}
+                />
+              </div>
             </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-n-200">
-              <div
-                className="h-full rounded-full transition-[width] duration-500"
-                style={{ width: `${(row.v / max) * 100}%`, background: row.bar }}
-              />
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
+      {marker && (
+        <p className="num mt-2 text-[12px] text-n-500">
+          {marker.label}: {format(marker.value)}
+        </p>
+      )}
+    </figure>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  EmptyState — used wherever the backend has nothing to report.        */
+/*  "Data unavailable" beats a fabricated chart.                         */
+/* ------------------------------------------------------------------ */
+
+export function EmptyState({
+  title,
+  children,
+}: {
+  title: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="card-muted px-4 py-6 text-center">
+      <p className="display text-[13px] font-medium tracking-[0.04em] text-n-600 uppercase">
+        {title}
+      </p>
+      {children && (
+        <p className="mx-auto mt-2 max-w-md text-[13px] leading-relaxed text-n-500">
+          {children}
+        </p>
+      )}
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/*  VerifierPanel — one verifier's identity, outcome, verdict          */
+/*  VerifierPanel — one verifier's identity, outcome, verdict. Shows     */
+/*  whichever measurement the backend actually sent: a mismatch rate     */
+/*  where it has one, otherwise the block counts it does have.           */
 /* ------------------------------------------------------------------ */
 
 export function VerifierPanel({
   name,
   index,
-  mismatchRate,
   verdict,
   timestamp,
   active = false,
+  mismatchRate,
+  blocks,
 }: {
   name: string;
   index: number;
-  mismatchRate: number;
   verdict: "accepted" | "rejected" | "pending";
   timestamp?: string;
   active?: boolean;
+  mismatchRate?: number;
+  blocks?: { failed: number; total: number };
 }) {
   return (
     <div
       className={`card-muted p-4 ${active ? "ring-1 ring-primary" : ""}`}
-      aria-label={`Verifier ${name}`}
+      aria-label={`Verifier ${index}: ${name}`}
     >
       <div className="flex items-center gap-2">
-        <span className="grid size-7 place-items-center rounded-[var(--qs-r-sm)] bg-surface-2 text-n-600">
+        <span className="grid size-7 shrink-0 place-items-center rounded-[var(--qs-r-sm)] bg-surface-2 text-n-600">
           <Icon name="eye" size={15} />
         </span>
         <div className="min-w-0">
@@ -491,14 +635,30 @@ export function VerifierPanel({
         </div>
       </div>
       <dl className="mt-4 space-y-2.5">
+        {mismatchRate !== undefined && (
+          <div className="flex items-baseline justify-between gap-2">
+            <dt className="display text-[12px] tracking-[0.04em] text-n-500 uppercase">
+              Mismatch
+            </dt>
+            <dd className="num text-[14px] font-semibold text-on-surface">
+              {mismatchRate.toFixed(3)}
+            </dd>
+          </div>
+        )}
+        {blocks && (
+          <div className="flex items-baseline justify-between gap-2">
+            <dt className="display text-[12px] tracking-[0.04em] text-n-500 uppercase">
+              Blocks failed
+            </dt>
+            <dd className="num text-[14px] font-semibold text-on-surface">
+              {blocks.failed} / {blocks.total}
+            </dd>
+          </div>
+        )}
         <div className="flex items-baseline justify-between gap-2">
-          <dt className="display text-[12px] text-n-500 uppercase">Mismatch</dt>
-          <dd className="num text-[14px] font-semibold text-on-surface">
-            {mismatchRate.toFixed(3)}
-          </dd>
-        </div>
-        <div className="flex items-baseline justify-between gap-2">
-          <dt className="display text-[12px] text-n-500 uppercase">Verdict</dt>
+          <dt className="display text-[12px] tracking-[0.04em] text-n-500 uppercase">
+            Verdict
+          </dt>
           <dd>
             <StatusBadge
               tone={verdict === "accepted" ? "honest" : verdict === "rejected" ? "attack" : "pending"}
@@ -509,7 +669,9 @@ export function VerifierPanel({
         </div>
         {timestamp && (
           <div className="flex items-baseline justify-between gap-2">
-            <dt className="display text-[12px] text-n-500 uppercase">Reported</dt>
+            <dt className="display text-[12px] tracking-[0.04em] text-n-500 uppercase">
+              Reported
+            </dt>
             <dd className="num text-[12px] text-n-500">{timestamp}</dd>
           </div>
         )}
@@ -534,7 +696,7 @@ export function EventLogRow({
   attackType: string;
   runId: string;
   verdict: "accepted" | "rejected";
-  flaggedBy: string;
+  flaggedBy: DetectionMechanism;
   detected: boolean;
 }) {
   return (
@@ -549,7 +711,9 @@ export function EventLogRow({
       <td className="px-3 py-2.5 whitespace-nowrap">
         <StatusBadge tone={detected ? "attack" : "honest"}>{verdict}</StatusBadge>
       </td>
-      <td className="px-3 py-2.5 whitespace-nowrap text-n-600">{flaggedBy}</td>
+      <td className="px-3 py-2.5 whitespace-nowrap text-n-600">
+        {mechanismLabel(flaggedBy)}
+      </td>
     </tr>
   );
 }

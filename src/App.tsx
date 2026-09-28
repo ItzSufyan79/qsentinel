@@ -1,15 +1,17 @@
 /**
  * Global shell — design report, section 5.
  *
- * Top nav bar: wordmark (violet, Plex Sans 600) + nav links + a persistent
- * StatusBadge showing whether a simulation is running. No footer.
+ * Top nav bar: wordmark + nav links + a persistent StatusBadge reporting the
+ * active-run state from GET /api/simulate/active. No footer.
  * Responsive: nav collapses to a hamburger under 768px.
+ *
+ * The dark class ships on <html> in index.html so the default theme is applied
+ * before first paint; the toggle below only has to keep React in sync.
  */
 
 import { useEffect, useState } from "react";
-import { NavLink, Route, Routes, useParams } from "react-router-dom";
+import { NavLink, Route, Routes } from "react-router-dom";
 import {
-  IconAtom,
   IconChartBar,
   IconEye,
   IconHome,
@@ -23,7 +25,7 @@ import {
 } from "@tabler/icons-react";
 import { api } from "./api";
 import type { ActiveResponse } from "./api/types";
-import { StatusBadge } from "./components/ui/atoms";
+import { StatusBadge, type BadgeTone } from "./components/ui/atoms";
 
 import { OverviewPage } from "./pages/Overview";
 import { NewSimulationPage } from "./pages/NewSimulation";
@@ -39,7 +41,7 @@ import { EventLogPage } from "./pages/EventLog";
 
 function useActiveRun() {
   const [active, setActive] = useState<ActiveResponse>({
-    active: false,
+    status: "none",
     runId: null,
     phase: null,
   });
@@ -66,12 +68,26 @@ function useActiveRun() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Theme — dark is the default                                        */
+/*  Theme — dark is the default, set on <html> before first paint        */
 /* ------------------------------------------------------------------ */
 
 function applyTheme(theme: "light" | "dark") {
   document.documentElement.classList.toggle("dark", theme === "dark");
 }
+
+/* ------------------------------------------------------------------ */
+/*  Header status — the four states the contract defines                */
+/* ------------------------------------------------------------------ */
+
+const RUN_STATUS: Record<
+  ActiveResponse["status"],
+  { tone: BadgeTone; label: string }
+> = {
+  none: { tone: "pending", label: "No active simulation" },
+  running: { tone: "disputed", label: "Simulation running" },
+  completed: { tone: "honest", label: "Simulation completed" },
+  disputed: { tone: "attack", label: "Simulation disputed" },
+};
 
 /* ------------------------------------------------------------------ */
 /*  Wordmark                                                           */
@@ -88,7 +104,7 @@ function Wordmark() {
         <span className="font-display text-[15px] font-semibold tracking-[0.14em] text-accent-ink uppercase md:text-[16px]">
           Qsentinel
         </span>
-        <span className="micro mt-1.5 hidden text-n-500 sm:block">
+        <span className="micro mt-1.5 hidden text-n-500 lg:block">
           signature threat detection
         </span>
       </span>
@@ -137,22 +153,22 @@ function ThemeToggle() {
 /* ------------------------------------------------------------------ */
 
 function NavItems({
-  activeRunId,
+  runId,
   onNavigate,
 }: {
-  activeRunId: string | null;
+  runId: string | null;
   onNavigate?: () => void;
 }) {
   // Live Run and Results are run-specific, so they fall back to New
   // Simulation until a run exists — but they are always in the nav.
   const runNav = [
     {
-      to: activeRunId ? `/simulate/run/${activeRunId}` : "/simulate/new",
+      to: runId ? `/simulate/run/${runId}` : "/simulate/new",
       label: "Live Run",
       icon: IconRoute,
     },
     {
-      to: activeRunId ? `/simulate/run/${activeRunId}/result` : "/simulate/new",
+      to: runId ? `/simulate/run/${runId}/result` : "/simulate/new",
       label: "Results",
       icon: IconEye,
     },
@@ -167,14 +183,14 @@ function NavItems({
           end={end as boolean | undefined}
           onClick={onNavigate}
           className={({ isActive }) =>
-            `flex flex-none items-center gap-1 rounded-[var(--qs-r)] px-1.5 py-1.5 font-display text-[11px] tracking-[0.03em] uppercase transition-colors lg:gap-2.5 lg:px-4 lg:py-2.5 lg:text-[13px] ${
+            `flex flex-none items-center gap-1.5 rounded-[var(--qs-r)] px-1.5 py-2 font-display text-[12px] tracking-[0.03em] uppercase transition-colors lg:gap-2.5 lg:px-4 lg:text-[13px] ${
               isActive
-                ? "bg-surface-2 font-semibold text-primary"
+                ? "bg-surface-2 font-semibold text-accent-ink"
                 : "text-n-600 hover:bg-surface-2/60 hover:text-on-bg"
             }`
           }
         >
-          <Icon size={16} />
+          <Icon size={16} className="hidden lg:block" />
           {label}
         </NavLink>
       ))}
@@ -184,14 +200,14 @@ function NavItems({
           to={to}
           onClick={onNavigate}
           className={({ isActive }) =>
-            `flex flex-none items-center gap-1 rounded-[var(--qs-r)] px-1.5 py-1.5 font-display text-[11px] tracking-[0.03em] uppercase transition-colors lg:gap-2.5 lg:px-4 lg:py-2.5 lg:text-[13px] ${
+            `flex flex-none items-center gap-1.5 rounded-[var(--qs-r)] px-1.5 py-2 font-display text-[12px] tracking-[0.03em] uppercase transition-colors lg:gap-2.5 lg:px-4 lg:text-[13px] ${
               isActive
-                ? "bg-surface-2 font-semibold text-primary"
+                ? "bg-surface-2 font-semibold text-accent-ink"
                 : "text-n-600 hover:bg-surface-2/60 hover:text-on-bg"
             }`
           }
         >
-          <Icon size={16} />
+          <Icon size={16} className="hidden lg:block" />
           {label}
         </NavLink>
       ))}
@@ -202,12 +218,8 @@ function NavItems({
 export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const activeRun = useActiveRun();
-  const activeRunId = activeRun.active ? activeRun.runId : null;
-
-  // dark by default, applied before first paint via the class on <html>
-  useEffect(() => {
-    applyTheme("dark");
-  }, []);
+  const runId = activeRun.runId;
+  const status = RUN_STATUS[activeRun.status];
 
   return (
     <div className="flex min-h-screen flex-col bg-bg">
@@ -220,13 +232,17 @@ export default function App() {
             className="hidden min-w-0 flex-1 items-center justify-center gap-2 md:flex"
             aria-label="Primary"
           >
-            <NavItems activeRunId={activeRunId} />
+            <NavItems runId={runId} />
           </nav>
 
           <div className="ml-auto flex flex-none items-center gap-3">
-            <StatusBadge tone={activeRun.active ? "disputed" : "pending"}>
-              {activeRun.active ? `running · ${activeRun.phase ?? ""}` : "idle"}
-            </StatusBadge>
+            <span className="hidden lg:inline-flex">
+              <StatusBadge tone={status.tone}>
+                {activeRun.status === "running" && activeRun.phase
+                  ? `${status.label} · ${activeRun.phase}`
+                  : status.label}
+              </StatusBadge>
+            </span>
             <ThemeToggle />
             {/* hamburger under 768px */}
             <button
@@ -235,6 +251,7 @@ export default function App() {
               onClick={() => setMenuOpen((v) => !v)}
               aria-label={menuOpen ? "Close menu" : "Open menu"}
               aria-expanded={menuOpen}
+              aria-controls="primary-mobile-nav"
             >
               {menuOpen ? <IconX size={16} /> : <IconMenu2 size={16} />}
             </button>
@@ -244,14 +261,15 @@ export default function App() {
         {/* mobile nav */}
         {menuOpen && (
           <nav
+            id="primary-mobile-nav"
             className="border-t border-outline bg-bg px-6 py-4 md:hidden"
             aria-label="Primary mobile"
           >
             <div className="grid grid-cols-2 gap-2">
-              <NavItems
-                activeRunId={activeRunId}
-                onNavigate={() => setMenuOpen(false)}
-              />
+              <NavItems runId={runId} onNavigate={() => setMenuOpen(false)} />
+            </div>
+            <div className="mt-4 border-t border-outline pt-4">
+              <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
             </div>
           </nav>
         )}
@@ -275,10 +293,3 @@ export default function App() {
     </div>
   );
 }
-
-export function useRunId(): string {
-  const { runId } = useParams<{ runId: string }>();
-  return runId ?? "";
-}
-
-export { IconAtom, IconEye, IconRoute };
