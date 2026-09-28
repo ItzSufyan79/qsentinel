@@ -36,7 +36,7 @@ export function ArbitrationPage() {
         </span>
         <div>
           <p className="micro text-primary">Dispute resolution</p>
-          <h1 className="font-condensed text-[28px] leading-tight font-semibold text-on-bg">
+          <h1 className="font-display text-[28px] leading-tight font-semibold text-on-bg">
             Arbitration
           </h1>
         </div>

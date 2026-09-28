@@ -149,6 +149,65 @@ const findRun = (runId: string): MockRun => {
   return run;
 };
 
+const ROOT_CAUSE: Record<AttackTypeId, string> = {
+  honest:
+    "No adversary was present. The measured error rate stayed inside the honest baseline, so the signature is consistent with an untampered run.",
+  forgery:
+    "The attacker signed a message that differs from the one the verifiers hold, using key material that does not match the transmitted signature.",
+  impersonation:
+    "A party with no valid key material claimed to be the sender. The signature was produced without access to the sender's private key pool.",
+  replay:
+    "A previously captured signature was retransmitted. The freshness check failed because the key slots were already consumed by an earlier run.",
+  "intercept-fixed":
+    "The attacker measured every transmitted state in one fixed basis. Errors cluster in the blocks where that basis disagreed with the sender's.",
+  "intercept-random":
+    "The attacker measured each state in a randomly chosen basis, producing a scattered, low-density error pattern across the block set.",
+  partial:
+    "The attacker altered only a fraction of the transmitted data. A contiguous run of blocks shows elevated errors, consistent with partial interference.",
+  tampering:
+    "The attacker altered the Pauli correction step in transit, producing a periodic error signature across the measurement outcomes.",
+  collusion:
+    "Two verifiers reported conflicting outcomes for the same signature, so their independent measurements could not be reconciled without arbitration.",
+};
+
+const MITIGATION: Record<AttackTypeId, string> = {
+  honest:
+    "No mitigation was required. The signature was accepted deterministically and the run closed normally.",
+  forgery:
+    "The quantum error-rate check flagged the mismatched key, and the verifiers rejected the signature before it could be accepted.",
+  impersonation:
+    "The verifiers confirmed the signature was produced without valid key material and rejected it on the quantum error-rate check.",
+  replay:
+    "The classical MAC freshness check detected the reused key slots and rejected the replayed signature.",
+  "intercept-fixed":
+    "The error-rate check isolated the blocks where the attacker's basis disagreed, and the threshold rule rejected the signature.",
+  "intercept-random":
+    "The scattered error pattern still exceeded the statistical threshold, so the signature was rejected despite the low per-block density.",
+  partial:
+    "The contiguous band of elevated errors exceeded the threshold, so the partially disturbed signature was rejected.",
+  tampering:
+    "The periodic error signature matched the tampering profile and the threshold rule rejected the signature.",
+  collusion:
+    "The dispute was routed to arbitration, where the two verifier reports were reconciled side by side and a single ruling issued.",
+};
+
+function severityFor(attack: AttackTypeId, mismatchRate: number): number {
+  if (attack === "honest") return 0;
+  const base: Record<AttackTypeId, number> = {
+    honest: 0,
+    forgery: 88,
+    impersonation: 84,
+    replay: 62,
+    "intercept-fixed": 74,
+    "intercept-random": 48,
+    partial: 30,
+    tampering: 92,
+    collusion: 55,
+  };
+  const jitter = Math.round(mismatchRate * 20);
+  return Math.max(0, Math.min(100, base[attack] + jitter));
+}
+
 /* ------------------------------------------------------------------ *
  *  QdsApi implementation
  * ------------------------------------------------------------------ */
@@ -240,6 +299,8 @@ export const mockApi: QdsApi = {
       encodedLength: BLOCKS,
       blocksOpened: BLOCKS,
       sentTo: VERIFIER_NAMES.slice(0, run.verifierCount),
+      attackType: run.attack,
+      intercepts: attackOption(run.attack).intercepts,
     };
   },
 
@@ -311,6 +372,9 @@ export const mockApi: QdsApi = {
               { sent: "basis: Z", received: "basis: X" },
             ],
       verifiers: results,
+      rootCause: ROOT_CAUSE[run.attack],
+      mitigation: MITIGATION[run.attack],
+      severityScore: severityFor(run.attack, mismatchRate),
     };
   },
 

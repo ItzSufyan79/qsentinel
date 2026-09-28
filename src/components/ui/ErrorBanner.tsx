@@ -48,7 +48,7 @@ export function ErrorBanner({ error }: { error: ApiError | null }) {
       role="alert"
       className="mb-4 rounded-[var(--qs-r)] border border-fail bg-fail-tint p-4"
     >
-      <p className="condensed text-[13px] font-semibold tracking-[0.04em] text-fail uppercase">
+      <p className="display text-[13px] font-semibold tracking-[0.04em] text-fail uppercase">
         {copy.title}
       </p>
       <p className="mt-1 text-[14px] leading-relaxed text-on-surface">{copy.advice}</p>

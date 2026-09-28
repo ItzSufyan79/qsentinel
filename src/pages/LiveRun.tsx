@@ -11,11 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { ApiError } from "../api";
-
-const toApiError = (e: unknown) =>
-  e instanceof ApiError
-    ? e
-    : new ApiError("BACKEND_ERROR", e instanceof Error ? e.message : String(e));
+import { useCountUp } from "../lib/useCountUp";
 import type {
   DistributionResponse,
   KeygenResponse,
@@ -32,8 +28,14 @@ import {
   StatusBadge,
   type PhaseId,
 } from "../components/ui/atoms";
+import { QuantumChannel } from "../components/ui/QuantumChannel";
 import { ErrorBanner } from "../components/ui/ErrorBanner";
 import { useRunId } from "../App";
+
+const toApiError = (e: unknown) =>
+  e instanceof ApiError
+    ? e
+    : new ApiError("BACKEND_ERROR", e instanceof Error ? e.message : String(e));
 
 const PHASE_ORDER: PhaseId[] = [
   "keygen",
@@ -42,6 +44,10 @@ const PHASE_ORDER: PhaseId[] = [
   "verification",
   "result",
 ];
+
+/** How long each phase's content stays on screen before advancing. */
+const PHASE_DWELL_MS = 1400;
+const dwell = (ms = PHASE_DWELL_MS) => new Promise((r) => setTimeout(r, ms));
 
 export function LiveRunPage() {
   const runId = useRunId();
@@ -70,9 +76,11 @@ export function LiveRunPage() {
     let cancelled = false;
     api
       .getKeygen(runId)
-      .then((d) => {
+      .then(async (d) => {
         if (cancelled) return;
         setKeygen(d);
+        await dwell();
+        if (cancelled) return;
         advance("distribution");
       })
       .catch((e) => !cancelled && setError(toApiError(e)));
@@ -87,9 +95,11 @@ export function LiveRunPage() {
     let cancelled = false;
     api
       .getDistribution(runId)
-      .then((d) => {
+      .then(async (d) => {
         if (cancelled) return;
         setDistribution(d);
+        await dwell();
+        if (cancelled) return;
         advance("signing");
       })
       .catch((e) => !cancelled && setError(toApiError(e)));
@@ -104,9 +114,11 @@ export function LiveRunPage() {
     let cancelled = false;
     api
       .getSigning(runId)
-      .then((d) => {
+      .then(async (d) => {
         if (cancelled) return;
         setSigning(d);
+        await dwell();
+        if (cancelled) return;
         advance("verification");
       })
       .catch((e) => !cancelled && setError(toApiError(e)));
@@ -143,6 +155,7 @@ export function LiveRunPage() {
   const mismatchRate = liveEvent
     ? liveEvent.block.mismatches / liveEvent.block.slotCount
     : 0;
+  const animatedMismatch = useCountUp(mismatchRate, 400);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
@@ -196,7 +209,7 @@ export function LiveRunPage() {
                       <Icon name="eye" size={17} />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="condensed text-[14px] font-semibold text-on-surface">{v.name}</p>
+                      <p className="display text-[14px] font-semibold text-on-surface">{v.name}</p>
                       <div className="meter mt-2">
                         <div
                           className="meter-fill bg-primary"
@@ -247,6 +260,9 @@ export function LiveRunPage() {
                     </StatusBadge>
                   ))}
                 </div>
+                <div className="mt-5 border-t border-outline pt-4">
+                  <QuantumChannel attacking={signing.intercepts} />
+                </div>
               </div>
             ) : (
               <div className="skeleton h-24 w-full" />
@@ -264,7 +280,7 @@ export function LiveRunPage() {
               <div>
                 <p className="micro text-n-500">Live mismatch rate</p>
                 <p className="num mt-1 text-[40px] leading-none font-semibold text-on-bg">
-                  {mismatchRate.toFixed(3)}
+                  {animatedMismatch.toFixed(3)}
                 </p>
                 <div className="relative mt-4 h-2 w-full rounded-full bg-n-200">
                   <div
@@ -285,7 +301,7 @@ export function LiveRunPage() {
               <div className="space-y-2">
                 {(results ?? []).map((r) => (
                   <div key={r.name} className="card-muted flex items-center justify-between p-3">
-                    <span className="condensed text-[13px] font-semibold text-on-surface">
+                    <span className="display text-[13px] font-semibold text-on-surface">
                       {r.name}
                     </span>
                     <span className="num text-[13px] text-n-500">

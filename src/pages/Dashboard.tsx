@@ -37,7 +37,7 @@ export function DashboardPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <p className="micro text-primary">Cumulative view</p>
-      <h1 className="mt-2 font-condensed text-[28px] leading-tight font-semibold text-on-bg">
+      <h1 className="mt-2 font-display text-[28px] leading-tight font-semibold text-on-bg">
         Analytics dashboard
       </h1>
       <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-n-600">
@@ -116,7 +116,7 @@ export function DashboardPage() {
                 <thead>
                   <tr className="border-b border-outline-strong text-left">
                     {["Attack type", "Runs", "Detected", "Detection rate"].map((h) => (
-                      <th key={h} className="condensed px-3 py-2.5 font-medium tracking-[0.04em] text-n-500 uppercase">
+                      <th key={h} className="display px-3 py-2.5 font-medium tracking-[0.04em] text-n-500 uppercase">
                         {h}
                       </th>
                     ))}

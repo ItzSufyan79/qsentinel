@@ -16,7 +16,8 @@
  * No decorative icons. If a concept has no mapping, it gets no icon.
  */
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { animate } from "animejs";
 import {
   IconActivity,
   IconAlertTriangle,
@@ -198,7 +199,7 @@ export function Banner({
       </span>
       <div className="min-w-0 flex-1">
         <p
-          className="condensed text-[12px] font-medium tracking-[0.06em] uppercase"
+          className="display text-[12px] font-medium tracking-[0.06em] uppercase"
           style={{ color: style.ink }}
         >
           {title}
@@ -255,7 +256,7 @@ export function PhaseStepper({
                 {state === "done" ? <Icon name="shield-check" size={14} /> : i + 1}
               </span>
               <span
-                className={`condensed text-center text-[12px] tracking-[0.04em] uppercase ${
+                className={`display text-center text-[12px] tracking-[0.04em] uppercase ${
                   state === "active"
                     ? "font-semibold text-on-bg"
                     : state === "done"
@@ -307,13 +308,15 @@ export function DataCard({
         : tone === "brand"
           ? "text-accent-ink"
           : "text-on-bg";
+  // numeric values count up; anything else renders as-is
+  const numeric = typeof value === "number" ? value : null;
   return (
     <div className="card-muted p-4">
-      <p className="condensed text-[12px] tracking-[0.06em] text-n-500 uppercase">
+      <p className="display text-[12px] tracking-[0.06em] text-n-500 uppercase">
         {label}
       </p>
       <p className={`num mt-2 text-[28px] leading-none font-semibold ${toneText}`}>
-        {value}
+        {numeric !== null ? <CountUp value={numeric} /> : value}
         {unit && (
           <span className="ml-1 text-[14px] font-normal text-n-500">{unit}</span>
         )}
@@ -321,6 +324,33 @@ export function DataCard({
       {hint && <p className="mt-2 text-[13px] leading-snug text-n-500">{hint}</p>}
     </div>
   );
+}
+
+/** Counts a number up to its value via anime.js. */
+function CountUp({ value }: { value: number }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const current = useRef(0);
+
+  useEffect(() => {
+    const from = current.current;
+    const state = { v: from };
+    const anim = animate(state, {
+      v: value,
+      duration: 900,
+      ease: "outExpo",
+      onUpdate: () => {
+        current.current = state.v;
+        if (ref.current) {
+          ref.current.textContent = state.v.toFixed(3);
+        }
+      },
+    });
+    return () => {
+      anim.cancel();
+    };
+  }, [value]);
+
+  return <span ref={ref}>{(0).toFixed(3)}</span>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -351,7 +381,7 @@ export function ParamSlider({
   return (
     <div>
       <div className="flex items-baseline justify-between gap-3">
-        <label className="condensed text-[13px] font-medium tracking-[0.04em] text-on-surface uppercase">
+        <label className="display text-[13px] font-medium tracking-[0.04em] text-on-surface uppercase">
           {label}
         </label>
         <span className="num text-[14px] font-semibold text-on-bg">
@@ -397,7 +427,7 @@ export function ComparisonBar({
   const max = Math.max(left, right, 1e-12);
   return (
     <div>
-      <p className="condensed mb-2 text-[13px] font-medium tracking-[0.04em] text-on-surface uppercase">
+      <p className="display mb-2 text-[13px] font-medium tracking-[0.04em] text-on-surface uppercase">
         {label}
       </p>
       <div className="space-y-2.5">
@@ -454,7 +484,7 @@ export function VerifierPanel({
           <Icon name="eye" size={15} />
         </span>
         <div className="min-w-0">
-          <p className="condensed truncate text-[13px] font-semibold text-on-surface">
+          <p className="display truncate text-[13px] font-semibold text-on-surface">
             {name}
           </p>
           <p className="micro text-n-500">Verifier {index}</p>
@@ -462,13 +492,13 @@ export function VerifierPanel({
       </div>
       <dl className="mt-4 space-y-2.5">
         <div className="flex items-baseline justify-between gap-2">
-          <dt className="condensed text-[12px] text-n-500 uppercase">Mismatch</dt>
+          <dt className="display text-[12px] text-n-500 uppercase">Mismatch</dt>
           <dd className="num text-[14px] font-semibold text-on-surface">
             {mismatchRate.toFixed(3)}
           </dd>
         </div>
         <div className="flex items-baseline justify-between gap-2">
-          <dt className="condensed text-[12px] text-n-500 uppercase">Verdict</dt>
+          <dt className="display text-[12px] text-n-500 uppercase">Verdict</dt>
           <dd>
             <StatusBadge
               tone={verdict === "accepted" ? "honest" : verdict === "rejected" ? "attack" : "pending"}
@@ -479,7 +509,7 @@ export function VerifierPanel({
         </div>
         {timestamp && (
           <div className="flex items-baseline justify-between gap-2">
-            <dt className="condensed text-[12px] text-n-500 uppercase">Reported</dt>
+            <dt className="display text-[12px] text-n-500 uppercase">Reported</dt>
             <dd className="num text-[12px] text-n-500">{timestamp}</dd>
           </div>
         )}

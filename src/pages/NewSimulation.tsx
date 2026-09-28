@@ -56,7 +56,7 @@ export function NewSimulationPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <p className="micro text-primary">Configure a run</p>
-      <h1 className="mt-2 font-condensed text-[28px] leading-tight font-semibold text-on-bg">
+      <h1 className="mt-2 font-display text-[28px] leading-tight font-semibold text-on-bg">
         New simulation
       </h1>
       <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-n-600">
@@ -98,7 +98,7 @@ export function NewSimulationPage() {
                         ✓
                       </span>
                       <span
-                        className={`condensed text-[13px] font-semibold tracking-[0.03em] uppercase ${
+                        className={`display text-[13px] font-semibold tracking-[0.03em] uppercase ${
                           active ? "text-on-bg" : "text-n-600"
                         }`}
                       >
@@ -144,7 +144,7 @@ export function NewSimulationPage() {
               onChange={setThreshold}
             />
             <div>
-              <p className="condensed text-[13px] font-medium tracking-[0.04em] text-on-surface uppercase">
+              <p className="display text-[13px] font-medium tracking-[0.04em] text-on-surface uppercase">
                 Verifiers
               </p>
               <p className="num mt-1 text-[14px] text-n-600">

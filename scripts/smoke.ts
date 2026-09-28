@@ -58,6 +58,12 @@ async function main() {
   const signing = await mockApi.getSigning(run.runId);
   check("signing returns an encoded signature", signing.encoded.length === signing.encodedLength);
   check("signing lists recipients", signing.sentTo.length === 1);
+  check("signing reports the attack type", signing.attackType === "forgery");
+  check("signing flags a non-intercepting attack", signing.intercepts === false);
+
+  const interceptRun = await mockApi.createRun("replay", 200, 0.1, 1);
+  const interceptSigning = await mockApi.getSigning(interceptRun.runId);
+  check("an intercepting attack is flagged", interceptSigning.intercepts === true);
 
   const events: string[] = [];
   const results = await mockApi.streamVerification(run.runId, (e) => {
@@ -73,6 +79,9 @@ async function main() {
   check("result reports a mismatch rate", result.mismatchRate >= 0);
   check("result names a flagged-by check", result.flaggedBy.length > 0);
   check("result lists verifier outcomes", result.verifiers.length === 1);
+  check("result explains the root cause", result.rootCause.length > 0);
+  check("result states the mitigation", result.mitigation.length > 0);
+  check("result carries a severity score", result.severityScore >= 0 && result.severityScore <= 100);
 
   const arb = await mockApi.getArbitration(run.runId);
   check("arbitration shows two verifiers", arb.verifiers.length === 2);

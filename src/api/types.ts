@@ -175,6 +175,10 @@ export interface SignResponse {
   encodedLength: number;
   blocksOpened: number;
   sentTo: string[];
+  /** the attack this run is subject to, so the channel can show an attacker */
+  attackType: AttackTypeId;
+  /** true when the attack interposes a node on the quantum channel */
+  intercepts: boolean;
 }
 
 export interface EveKnowledge {
@@ -228,6 +232,12 @@ export interface ResultResponse {
   /** what the attacker changed vs. what the signer sent — only when not honest */
   flaggedDiff?: { sent: string; received: string }[];
   verifiers: VerifierResult[];
+  /** plain-language explanation of what the attack did */
+  rootCause: string;
+  /** how the framework contained or rejected it */
+  mitigation: string;
+  /** 0–100, derived from mismatch rate, threshold margin and attack type */
+  severityScore: number;
 }
 
 /** GET /api/simulate/{run_id}/arbitration */

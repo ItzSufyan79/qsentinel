@@ -45,7 +45,7 @@ export function EventLogPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="micro text-primary">Security event log</p>
-          <h1 className="mt-2 font-condensed text-[28px] leading-tight font-semibold text-on-bg">
+          <h1 className="mt-2 font-display text-[28px] leading-tight font-semibold text-on-bg">
             Event log
           </h1>
         </div>
@@ -114,7 +114,7 @@ export function EventLogPage() {
                         (h) => (
                           <th
                             key={h}
-                            className="condensed px-3 py-2.5 font-medium tracking-[0.04em] text-n-500 uppercase"
+                            className="display px-3 py-2.5 font-medium tracking-[0.04em] text-n-500 uppercase"
                           >
                             {h}
                           </th>

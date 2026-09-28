@@ -160,10 +160,10 @@
   --color-warn: var(--qs-warn);
   --color-pending: var(--qs-pending);
 
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  --font-condensed: "IBM Plex Sans Condensed", "IBM Plex Sans", ui-sans-serif,
-    sans-serif;
+  /* Fonts: Fontshare — Clash Display (display), General Sans (body), Nippo (data) */
+  --font-sans: "General Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Nippo", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-display: "Clash Display", "General Sans", ui-sans-serif, sans-serif;
 
   --ease-flow: var(--ease-out);
 }
@@ -272,8 +272,8 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .condensed {
-    font-family: var(--font-condensed);
+  .display {
+    font-family: var(--font-display);
   }
 
   .section-band {
@@ -315,7 +315,7 @@
   }
 
   .section-band .band-title {
-    font-family: var(--font-condensed);
+    font-family: var(--font-display);
     font-size: 13px;
     font-weight: 500;
     letter-spacing: 0.06em;
@@ -340,7 +340,7 @@
     border: 1px solid currentColor;
     border-radius: var(--qs-r-sm);
     padding: 0.15rem 0.5rem;
-    font-family: var(--font-condensed);
+    font-family: var(--font-display);
     font-size: 12px;
     font-weight: 500;
     letter-spacing: 0.05em;
@@ -365,7 +365,7 @@
     border: 1px solid transparent;
     border-radius: var(--qs-r);
     padding: 0.65rem 1rem;
-    font-family: var(--font-condensed);
+    font-family: var(--font-display);
     font-size: 13px;
     font-weight: 500;
     letter-spacing: 0.05em;
@@ -459,7 +459,7 @@
   }
 
   .stamp-label {
-    font-family: var(--font-condensed);
+    font-family: var(--font-display);
     font-size: clamp(1.1rem, 3.2vw, 1.5rem);
     font-weight: 600;
     letter-spacing: 0.1em;
@@ -502,22 +502,15 @@
     color: var(--qs-n-500);
   }
 
-  /* blueprint canvas grid */
+  /* faint dot grid — texture without the sketchy line-grid look */
   .canvas-grid {
-    position: relative;
-    background-image:
-      linear-gradient(
-        to right,
-        color-mix(in oklab, var(--qs-outline) 70%, transparent) 1px,
-        transparent 1px
-      ),
-      linear-gradient(
-        to bottom,
-        color-mix(in oklab, var(--qs-outline) 70%, transparent) 1px,
-        transparent 1px
-      );
-    background-size: 26px 26px;
-    background-position: -1px -1px;
+    background-image: radial-gradient(
+      circle,
+      color-mix(in oklab, var(--qs-outline) 55%, transparent) 1px,
+      transparent 1px
+    );
+    background-size: 22px 22px;
+    background-position: center;
   }
 }
 

@@ -21,13 +21,18 @@ only from a disputed verdict.
 | `/` | Overview | `GET /api/stats/forgery-comparison` |
 | `/simulate/new` | New Simulation | `GET /api/simulate/preview`, `POST /api/simulate/run` |
 | `/simulate/run/:runId` | Live Simulation | `GET .../keygen`, `.../distribution`, `.../signing`, `.../verification` |
-| `/simulate/run/:runId/result` | Results | `GET .../result` |
-| `/simulate/run/:runId/arbitration` | Arbitration *(hidden)* | `GET .../arbitration` |
+| `/simulate/run/:runId/result` | Results | `GET .../result` || `/simulate/run/:runId/arbitration` | Arbitration *(hidden)* | `GET .../arbitration` |
 | `/dashboard` | Analytics Dashboard | `GET /api/stats/summary`, `.../by-attack-type`, `.../histogram`, `.../forgery-comparison` |
 | `/log` | Event Log | `GET /api/log`, `GET /api/log/export` |
 
 The nav bar carries a persistent badge that polls `GET /api/simulate/active`.
 There is no footer.
+
+The Results page shows a verdict stamp, the three stat cards, an animated
+**quantum severity score** gauge (0–100), a **root cause & mitigation**
+analysis, the flagged-by check, ground-truth diffs and per-verifier outcomes.
+Live Simulation runs an animated quantum channel — photons flow signer →
+verifier, and an attacker node interposes for intercepting attacks.
 
 ## Design system
 
@@ -40,10 +45,11 @@ Four colours, fixed roles — a fifth is never introduced:
 | Signal red | `#C23B3B` | this failed — never decorative |
 | Slate | `#2A2E37` / `#F4F5F7` | surfaces, borders, body text |
 
-**Type:** IBM Plex (Sans 600/400, Sans Condensed 500, Mono 400), bundled
-locally via Fontsource so the demo works offline. **Scale:** 28 / 20 / 16 / 14 /
-13 / 12px — never below 12px. **Icons:** Tabler outline, on a fixed concept
-mapping. No emoji anywhere.
+**Type:** Fontshare — Clash Display (display/headings), General Sans (body/UI),
+Nippo (data/monospace). Three visually distinct families, so display, body and
+data never read as the same face. **Scale:** 28 / 20 / 16 / 14 / 13 / 12px —
+never below 12px. **Icons:** Tabler outline, on a fixed concept mapping. No
+emoji anywhere.
 
 The full build spec is the UI/UX design report (PS 26141, Egreen Quanta). Every
 component is drawn from the inventory in `src/components/ui/atoms.tsx` —
@@ -97,12 +103,12 @@ overflow, clipped text, sub-12px type, and WCAG AA contrast at 1440 / 834 /
 
 ## Stack
 
-React 19 · TypeScript · Vite 8 · Tailwind CSS v4 · Zustand · react-router 7 ·
-oxlint · Tabler Icons · IBM Plex
+React 19 · TypeScript · Vite 8 · Tailwind CSS v4 · react-router 7 · animejs ·
+Tabler Icons · Fontshare (Clash Display, General Sans, Nippo) · oxlint
 
-No chart library and no animation library. Every visualisation is hand-written
-SVG and every transition is CSS, which keeps the bundle at ~97 kB gzipped and
-makes the interface render identically under `prefers-reduced-motion`.
+No chart library. Every visualisation is hand-written SVG and every transition
+is CSS or anime.js, which keeps the bundle at ~113 kB gzipped and makes the
+interface render identically under `prefers-reduced-motion`.
 
 ## Licence
 

@@ -26,8 +26,7 @@ product — do not derive it in React.
 | GET | `/api/simulate/{run_id}/distribution` | Live Simulation | `DistributionResponse` |
 | GET | `/api/simulate/{run_id}/signing` | Live Simulation | `SignResponse` |
 | GET | `/api/simulate/{run_id}/verification` | Live Simulation | `VerifyEvent` stream |
-| GET | `/api/simulate/{run_id}/result` | Results | `ResultResponse` |
-| GET | `/api/simulate/{run_id}/arbitration` | Arbitration | `ArbitrationResponse` |
+| GET | `/api/simulate/{run_id}/result` | Results | `ResultResponse` || GET | `/api/simulate/{run_id}/arbitration` | Arbitration | `ArbitrationResponse` |
 | GET | `/api/stats/summary` | Dashboard | `StatsSummary` |
 | GET | `/api/stats/by-attack-type` | Dashboard | `ByAttackTypeRow[]` |
 | GET | `/api/stats/histogram` | Dashboard | `HistogramResponse` |
@@ -47,6 +46,9 @@ Nine options, from spec section 4.2. `AttackTypeId` in `types.ts`:
 
 `collusion` is the one that routes to the Arbitration page. `partial` is the
 only one with an intensity slider.
+
+`ResultResponse` also carries `rootCause`, `mitigation` and `severityScore`
+(0–100) — the Results page renders all three.
 
 ## The three numbers judges will ask for
 

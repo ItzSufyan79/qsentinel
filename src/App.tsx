@@ -78,12 +78,12 @@ function applyTheme(theme: "light" | "dark") {
 function Wordmark() {
   return (
     <NavLink to="/" className="flex items-center gap-2.5">
-      <span className="relative grid size-8 place-items-center rounded-[var(--qs-r-sm)] bg-primary font-condensed text-[15px] font-semibold text-on-primary">
+      <span className="relative grid size-8 place-items-center rounded-[var(--qs-r-sm)] bg-primary font-display text-[15px] font-semibold text-on-primary">
         Q
         <span className="absolute -right-[3px] -bottom-[3px] size-[5px] rounded-[1px] bg-bg" />
       </span>
       <span className="flex flex-col leading-none">
-        <span className="font-condensed text-[15px] font-semibold tracking-[0.14em] text-primary uppercase">
+        <span className="font-display text-[15px] font-semibold tracking-[0.14em] text-primary uppercase">
           Qsentinel
         </span>
         <span className="micro mt-1 text-n-500">signature threat detection</span>
@@ -163,7 +163,7 @@ function NavItems({
           end={end as boolean | undefined}
           onClick={onNavigate}
           className={({ isActive }) =>
-            `flex flex-none items-center gap-2 rounded-[var(--qs-r)] px-3 py-2 font-condensed text-[13px] tracking-[0.04em] uppercase transition-colors ${
+            `flex flex-none items-center gap-2 rounded-[var(--qs-r)] px-3 py-2 font-display text-[13px] tracking-[0.04em] uppercase transition-colors ${
               isActive
                 ? "bg-surface-2 font-semibold text-primary"
                 : "text-n-600 hover:text-on-bg"
@@ -180,7 +180,7 @@ function NavItems({
           to={to}
           onClick={onNavigate}
           className={({ isActive }) =>
-            `flex flex-none items-center gap-2 rounded-[var(--qs-r)] px-3 py-2 font-condensed text-[13px] tracking-[0.04em] uppercase transition-colors ${
+            `flex flex-none items-center gap-2 rounded-[var(--qs-r)] px-3 py-2 font-display text-[13px] tracking-[0.04em] uppercase transition-colors ${
               isActive
                 ? "bg-surface-2 font-semibold text-primary"
                 : "text-n-600 hover:text-on-bg"

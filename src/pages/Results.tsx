@@ -16,6 +16,7 @@ import {
   SectionHead,
   StatusBadge,
 } from "../components/ui/atoms";
+import { SeverityGauge } from "../components/ui/SeverityGauge";
 import { ErrorBanner } from "../components/ui/ErrorBanner";
 import { useRunId } from "../App";
 
@@ -31,7 +32,7 @@ export function ResultsPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
       <p className="micro text-primary">Run result</p>
-      <h1 className="mt-2 font-condensed text-[28px] leading-tight font-semibold text-on-bg">
+      <h1 className="mt-2 font-display text-[28px] leading-tight font-semibold text-on-bg">
         Results
       </h1>
 
@@ -54,20 +55,49 @@ export function ResultsPage() {
               </span>
             </div>
 
-            {/* stat row */}
-            <div className="grid gap-3 sm:grid-cols-3">
-              <DataCard
-                label="Mismatch rate observed"
-                value={data.mismatchRate.toFixed(3)}
-                tone={rejected ? "fail" : "pass"}
-              />
-              <DataCard label="Threshold T" value={data.threshold.toFixed(3)} />
-              <DataCard label="Confidence" value={data.confidence} />
+            {/* stat row + severity gauge */}
+            <div className="grid gap-6 lg:grid-cols-[1fr_auto]">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <DataCard
+                  label="Mismatch rate observed"
+                  value={data.mismatchRate.toFixed(3)}
+                  tone={rejected ? "fail" : "pass"}
+                />
+                <DataCard label="Threshold T" value={data.threshold.toFixed(3)} />
+                <DataCard label="Confidence" value={data.confidence} />
+              </div>
+              <Panel className="flex items-center justify-center p-5">
+                <div className="text-center">
+                  <p className="micro mb-3 text-n-500">Quantum severity score</p>
+                  <SeverityGauge score={data.severityScore} />
+                </div>
+              </Panel>
             </div>
+
+            {/* root cause & mitigation */}
+            <Panel className="p-5">
+              <SectionHead step="B" title="Root cause &amp; mitigation" state="done">
+                <span className="micro text-n-500">analysis</span>
+              </SectionHead>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <p className="micro text-fail">Root cause</p>
+                  <p className="mt-1.5 text-[14px] leading-relaxed text-on-surface">
+                    {data.rootCause}
+                  </p>
+                </div>
+                <div>
+                  <p className="micro text-pass">Mitigation</p>
+                  <p className="mt-1.5 text-[14px] leading-relaxed text-on-surface">
+                    {data.mitigation}
+                  </p>
+                </div>
+              </div>
+            </Panel>
 
             {/* flagged by */}
             <Panel className="p-5">
-              <SectionHead step="A" title="Flagged by" state={rejected ? "done" : "pending"}>
+              <SectionHead step="C" title="Flagged by" state={rejected ? "done" : "pending"}>
                 <span className="micro text-n-500">flagged_by</span>
               </SectionHead>
               <p className="text-[15px] text-on-surface">
@@ -84,7 +114,7 @@ export function ResultsPage() {
             {/* ground-truth diffs */}
             {data.flaggedDiff && data.flaggedDiff.length > 0 && (
               <Panel className="p-5">
-                <SectionHead step="B" title="Ground-truth diff" state="done">
+                <SectionHead step="D" title="Ground-truth diff" state="done">
                   <span className="micro text-n-500">flagged_diff</span>
                 </SectionHead>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -102,12 +132,12 @@ export function ResultsPage() {
 
             {/* per-verifier */}
             <Panel className="p-5">
-              <SectionHead step="C" title="Verifier outcomes" state="done" />
+              <SectionHead step="E" title="Verifier outcomes" state="done" />
               <div className="grid gap-3 sm:grid-cols-2">
                 {data.verifiers.map((v) => (
                   <div key={v.name} className="card-muted flex items-center justify-between p-4">
                     <div>
-                      <p className="condensed text-[14px] font-semibold text-on-surface">{v.name}</p>
+                      <p className="display text-[14px] font-semibold text-on-surface">{v.name}</p>
                       <p className="num mt-0.5 text-[12px] text-n-500">
                         {v.failed}/{v.total} blocks failed
                       </p>
