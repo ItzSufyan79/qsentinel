@@ -29,7 +29,7 @@ export function ArbitrationPage() {
   );
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-6xl px-6 py-16 md:px-10">
       <div className="flex items-center gap-3">
         <span className="grid size-9 place-items-center rounded-[var(--qs-r-sm)] bg-primary text-on-primary">
           <Icon name="scale" size={18} />

@@ -158,7 +158,7 @@ export function LiveRunPage() {
   const animatedMismatch = useCountUp(mismatchRate, 400);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+    <div className="mx-auto max-w-6xl px-6 py-14 md:px-10">
       <div className="card p-5 sm:p-6">
         <PhaseStepper current={phase} maxReached={maxReached} />
       </div>

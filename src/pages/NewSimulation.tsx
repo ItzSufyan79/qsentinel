@@ -54,7 +54,7 @@ export function NewSimulationPage() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-6xl px-6 py-16 md:px-10">
       <p className="micro text-primary">Configure a run</p>
       <h1 className="mt-2 font-display text-[28px] leading-tight font-semibold text-on-bg">
         New simulation

@@ -15,8 +15,10 @@ import {
   IconHome,
   IconListDetails,
   IconMenu2,
+  IconMoon,
   IconRocket,
   IconRoute,
+  IconSun,
   IconX,
 } from "@tabler/icons-react";
 import { api } from "./api";
@@ -77,16 +79,18 @@ function applyTheme(theme: "light" | "dark") {
 
 function Wordmark() {
   return (
-    <NavLink to="/" className="flex items-center gap-2.5">
-      <span className="relative grid size-8 place-items-center rounded-[var(--qs-r-sm)] bg-primary font-display text-[15px] font-semibold text-on-primary">
+    <NavLink to="/" className="flex flex-none items-center gap-2.5">
+      <span className="relative grid size-9 place-items-center rounded-[var(--qs-r)] bg-primary font-display text-[16px] font-semibold text-on-primary md:size-10 md:text-[17px]">
         Q
         <span className="absolute -right-[3px] -bottom-[3px] size-[5px] rounded-[1px] bg-bg" />
       </span>
       <span className="flex flex-col leading-none">
-        <span className="font-display text-[15px] font-semibold tracking-[0.14em text-accent-ink uppercase">
+        <span className="font-display text-[15px] font-semibold tracking-[0.14em] text-accent-ink uppercase md:text-[16px]">
           Qsentinel
         </span>
-        <span className="micro mt-1 text-n-500">signature threat detection</span>
+        <span className="micro mt-1.5 hidden text-n-500 sm:block">
+          signature threat detection
+        </span>
       </span>
     </NavLink>
   );
@@ -123,7 +127,7 @@ function ThemeToggle() {
       onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
       aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
     >
-      {theme === "dark" ? "light" : "dark"}
+      {theme === "dark" ? <IconSun size={15} /> : <IconMoon size={15} />}
     </button>
   );
 }
@@ -163,14 +167,14 @@ function NavItems({
           end={end as boolean | undefined}
           onClick={onNavigate}
           className={({ isActive }) =>
-            `flex flex-none items-center gap-2 rounded-[var(--qs-r)] px-3 py-2 font-display text-[13px] tracking-[0.04em] uppercase transition-colors ${
+            `flex flex-none items-center gap-1 rounded-[var(--qs-r)] px-1.5 py-1.5 font-display text-[11px] tracking-[0.03em] uppercase transition-colors lg:gap-2.5 lg:px-4 lg:py-2.5 lg:text-[13px] ${
               isActive
                 ? "bg-surface-2 font-semibold text-primary"
-                : "text-n-600 hover:text-on-bg"
+                : "text-n-600 hover:bg-surface-2/60 hover:text-on-bg"
             }`
           }
         >
-          <Icon size={15} />
+          <Icon size={16} />
           {label}
         </NavLink>
       ))}
@@ -180,14 +184,14 @@ function NavItems({
           to={to}
           onClick={onNavigate}
           className={({ isActive }) =>
-            `flex flex-none items-center gap-2 rounded-[var(--qs-r)] px-3 py-2 font-display text-[13px] tracking-[0.04em] uppercase transition-colors ${
+            `flex flex-none items-center gap-1 rounded-[var(--qs-r)] px-1.5 py-1.5 font-display text-[11px] tracking-[0.03em] uppercase transition-colors lg:gap-2.5 lg:px-4 lg:py-2.5 lg:text-[13px] ${
               isActive
                 ? "bg-surface-2 font-semibold text-primary"
-                : "text-n-600 hover:text-on-bg"
+                : "text-n-600 hover:bg-surface-2/60 hover:text-on-bg"
             }`
           }
         >
-          <Icon size={15} />
+          <Icon size={16} />
           {label}
         </NavLink>
       ))}
@@ -208,15 +212,18 @@ export default function App() {
   return (
     <div className="flex min-h-screen flex-col bg-bg">
       <header className="sticky top-0 z-30 border-b border-outline bg-bg">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-[1440px] items-center gap-4 px-5 py-4 md:px-8 lg:gap-8 lg:px-10">
           <Wordmark />
 
-          {/* desktop nav */}
-          <nav className="ml-4 hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto md:flex" aria-label="Primary">
+          {/* desktop nav — centred in the space between wordmark and actions */}
+          <nav
+            className="hidden min-w-0 flex-1 items-center justify-center gap-2 md:flex"
+            aria-label="Primary"
+          >
             <NavItems activeRunId={activeRunId} />
           </nav>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex flex-none items-center gap-3">
             <StatusBadge tone={activeRun.active ? "disputed" : "pending"}>
               {activeRun.active ? `running · ${activeRun.phase ?? ""}` : "idle"}
             </StatusBadge>
@@ -237,10 +244,10 @@ export default function App() {
         {/* mobile nav */}
         {menuOpen && (
           <nav
-            className="border-t border-outline bg-bg px-4 py-3 md:hidden"
+            className="border-t border-outline bg-bg px-6 py-4 md:hidden"
             aria-label="Primary mobile"
           >
-            <div className="flex flex-col gap-1">
+            <div className="grid grid-cols-2 gap-2">
               <NavItems
                 activeRunId={activeRunId}
                 onNavigate={() => setMenuOpen(false)}
