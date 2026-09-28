@@ -40,10 +40,13 @@ Four colours, fixed roles — a fifth is never introduced:
 
 | Role | Hex | Meaning |
 | --- | --- | --- |
-| Quantum violet | `#5B3FA0` | the system is acting |
-| Signal teal | `#0C7A6C` | this passed |
-| Signal red | `#C23B3B` | this failed — never decorative |
-| Slate | `#2A2E37` / `#F4F5F7` | surfaces, borders, body text |
+| Copper | `#BA7F5D` | the system is acting |
+| Sage | `#8A9A7E` | this passed |
+| Rust | `#A8493A` | this failed — never decorative |
+| Warm brown | `#3E362F` / `#F6EFE7` | surfaces, borders, body text |
+
+The copper and sage fills are mid-tones, so text usages deepen them
+(`--qs-accent-ink`, `--qs-pass-ink`) to clear WCAG AA on the cream surface.
 
 **Type:** Fontshare — Clash Display (display/headings), General Sans (body/UI),
 Nippo (data/monospace). Three visually distinct families, so display, body and

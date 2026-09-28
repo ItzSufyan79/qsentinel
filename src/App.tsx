@@ -83,7 +83,7 @@ function Wordmark() {
         <span className="absolute -right-[3px] -bottom-[3px] size-[5px] rounded-[1px] bg-bg" />
       </span>
       <span className="flex flex-col leading-none">
-        <span className="font-display text-[15px] font-semibold tracking-[0.14em] text-primary uppercase">
+        <span className="font-display text-[15px] font-semibold tracking-[0.14em text-accent-ink uppercase">
           Qsentinel
         </span>
         <span className="micro mt-1 text-n-500">signature threat detection</span>

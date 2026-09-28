@@ -7,72 +7,75 @@
    Source: UI/UX design report, PS 26141 (Egreen Quanta).
 
    Four colours, fixed roles — a fifth is never introduced:
-     violet  #5B3FA0  "the system is acting"
-     teal    #0F8577  "this passed"
-     red     #C23B3B  "this failed"  — never decorative
-     slate   #2A2E37 / #F4F5F7  surfaces, borders, body text
+     copper   #BA7F5D  "the system is acting"
+     sage     #8A9A7E  "this passed"
+     rust     #A8493A  "this failed"  — never decorative
+     brown    #3E362F / #F6EFE7  surfaces, borders, body text
 
-   Type: IBM Plex. Scale 28 / 20 / 16 / 14 / 13 / 12. Never below 12px.
+   Type: Fontshare — Clash Display / General Sans / Nippo.
+   Scale 28 / 20 / 16 / 14 / 13 / 12. Never below 12px.
    ================================================================== */
 
 :root {
   color-scheme: light;
 
-  /* brand — the four locked roles.
-     The spec's #0F8577 clears AA on white (4.53:1) but not on the spec's own
-     #F4F5F7 surface (4.15:1), so the teal is deepened just enough to pass. */
-  --qs-primary: #5b3fa0;
-  --qs-secondary: #0c7a6c;
-  --qs-fail: #c23b3b;
+  /* brand — the four locked roles (fills) */
+  --qs-primary: #ba7f5d;
+  --qs-secondary: #8a9a7e;
+  --qs-fail: #a8493a;
 
-  /* brand hue as foreground — dark needs a lighter tint to clear AA */
-  --qs-accent-ink: var(--qs-primary);
-  /* pass green flips light/dark, so its foreground flips with it */
-  --qs-on-pass: #ffffff;
+  /* brand hue as *foreground*. The copper fill is a mid-tone that fails AA as
+     text on the cream surface, so it is deepened for text usage. */
+  --qs-accent-ink: #8f6143;
+  /* pass green is a fill; its foreground flips light/dark with the theme */
+  --qs-on-pass: #2a241e;
+  /* pass text on the light pass-tint chip — a darker sage that clears AA */
+  --qs-pass-ink: #5f6b52;
 
   /* surfaces */
-  --qs-bg: #ffffff;
-  --qs-surface: #f4f5f7;
-  --qs-surface-2: #e9eaee;
+  --qs-bg: #f6efe7;
+  --qs-surface: #f6efe7;
+  --qs-surface-2: #ede4d7;
 
   /* content on top of the above */
-  --qs-on-bg: #2a2e37;
-  --qs-on-surface: #2a2e37;
-  --qs-on-primary: #ffffff;
-  --qs-on-secondary: #ffffff;
+  --qs-on-bg: #3e362f;
+  --qs-on-surface: #3e362f;
+  --qs-on-primary: #2a241e;
+  --qs-on-secondary: #2a241e;
   --qs-on-error: #ffffff;
 
-  /* neutral slate ramp */
-  --qs-n-50: #f8fafc;
-  --qs-n-100: #f1f5f9;
-  --qs-n-200: #e2e8f0;
-  --qs-n-300: #cbd5e1;
-  --qs-n-400: #94a3b8;
-  --qs-n-500: #64748b;
-  --qs-n-600: #475569;
-  --qs-n-700: #334155;
-  --qs-n-800: #1e293b;
-  --qs-n-900: #0f172a;
+  /* neutral warm-brown ramp */
+  --qs-n-50: #fbf7f1;
+  --qs-n-100: #f6efe7;
+  --qs-n-200: #ede4d7;
+  --qs-n-300: #dfd2c1;
+  --qs-n-400: #c0b19d;
+  --qs-n-500: #6e6355;
+  --qs-n-600: #5a5145;
+  --qs-n-700: #463f34;
+  --qs-n-800: #3e362f;
+  --qs-n-900: #2a241e;
 
-  --qs-outline: #e2e8f0;
-  --qs-outline-strong: #cbd5e1;
+  --qs-outline: #e4daca;
+  --qs-outline-strong: #c9bca6;
 
-  /* ink — near-black used for primary actions and data */
-  --qs-ink: #0f172a;
-  --qs-ink-soft: #1e293b;
+  /* ink — deep warm brown used for primary actions and data */
+  --qs-ink: #2a241e;
+  --qs-ink-soft: #3e362f;
 
   /* geometry: near-square, instrument-like */
   --qs-r: 3px;
   --qs-r-sm: 2px;
 
-  /* semantic state — never reused for anything else */
-  --qs-pass: #0c7a6c;
-  --qs-pass-tint: color-mix(in oklab, var(--qs-pass) 10%, transparent);
-  --qs-fail: #c23b3b;
-  --qs-fail-tint: color-mix(in oklab, var(--qs-fail) 8%, transparent);
-  --qs-warn: #b45309;
+  /* semantic state — never reused for anything else. Pass/fail/warn keep the
+     palette hue; text usages use the ink tones that clear AA. */
+  --qs-pass: #8a9a7e;
+  --qs-pass-tint: color-mix(in oklab, var(--qs-pass) 12%, transparent);
+  --qs-fail: #a8493a;
+  --qs-fail-tint: color-mix(in oklab, var(--qs-fail) 10%, transparent);
+  --qs-warn: #8a5e24;
   --qs-warn-tint: color-mix(in oklab, var(--qs-warn) 12%, transparent);
-  --qs-pending: #64748b;
+  --qs-pending: #6e6355;
   --qs-pending-tint: color-mix(in oklab, var(--qs-pending) 12%, transparent);
 
   /* motion — scaled globally by the fast-forward control */
@@ -89,41 +92,44 @@
 .dark {
   color-scheme: dark;
 
-  --qs-bg: #0f172a;
-  --qs-surface: #1e293b;
-  --qs-surface-2: #334155;
-  --qs-on-bg: #f1f5f9;
-  --qs-on-surface: #f1f5f9;
+  --qs-bg: #221d18;
+  --qs-surface: #2c2620;
+  --qs-surface-2: #3a332b;
+  --qs-on-bg: #f0e9df;
+  --qs-on-surface: #f0e9df;
 
-  --qs-n-50: #0f172a;
-  --qs-n-100: #1e293b;
-  --qs-n-200: #334155;
-  --qs-n-300: #475569;
-  --qs-n-400: #64748b;
-  --qs-n-500: #94a3b8;
-  --qs-n-600: #cbd5e1;
-  --qs-n-700: #e2e8f0;
-  --qs-n-800: #f1f5f9;
-  --qs-n-900: #f8fafc;
+  --qs-n-50: #221d18;
+  --qs-n-100: #2c2620;
+  --qs-n-200: #3a332b;
+  --qs-n-300: #4a4238;
+  --qs-n-400: #6e6355;
+  --qs-n-500: #a89a88;
+  --qs-n-600: #c0b19d;
+  --qs-n-700: #dfd2c1;
+  --qs-n-800: #f0e9df;
+  --qs-n-900: #f6efe7;
 
-  --qs-accent-ink: #a78bfa;
-  --qs-on-pass: #04211d;
+  --qs-outline: #3a332b;
+  --qs-outline-strong: #4a4238;
+  --qs-ink: #f6efe7;
+  --qs-ink-soft: #f0e9df;
 
-  --qs-outline: #334155;
-  --qs-outline-strong: #475569;
-  --qs-ink: #f8fafc;
-  --qs-ink-soft: #f1f5f9;
+  /* brand fills are lightened to clear AA on the dark warm surface */
+  --qs-primary: #d09a7a;
+  --qs-secondary: #a8b89a;
+  --qs-fail: #e08a7a;
 
-  --qs-primary: #a78bfa;
-  --qs-secondary: #2dd4bf;
-  --qs-fail: #f87171;
+  --qs-accent-ink: #d09a7a;
+  --qs-on-pass: #221d18;
+  --qs-pass-ink: #a8b89a;
 
-  /* primary is a light violet in dark mode, so its foreground flips dark */
-  --qs-on-primary: #241f3a;
+  --qs-on-primary: #2a241e;
+  --qs-on-secondary: #221d18;
+  --qs-on-error: #2a241e;
 
-  --qs-pass: #2dd4bf;
-  --qs-warn: #fbbf24;
-  --qs-pending: #94a3b8;
+  --qs-pass: #a8b89a;
+  --qs-warn: #e0a84a;
+  --qs-pending: #a89a88;
 }
 
 @theme inline {
@@ -348,12 +354,12 @@
     line-height: 1.5;
   }
 
-  .chip-pass { color: var(--qs-pass); background: var(--qs-pass-tint); }
+  .chip-pass { color: var(--qs-pass-ink); background: var(--qs-pass-tint); }
   .chip-fail { color: var(--qs-fail); background: var(--qs-fail-tint); }
   .chip-warn { color: var(--qs-warn); background: var(--qs-warn-tint); }
   .chip-pending { color: var(--qs-pending); background: var(--qs-pending-tint); }
   .chip-neutral { color: var(--qs-n-600); background: var(--qs-surface-2); }
-  .chip-brand { color: var(--qs-primary); background: color-mix(in oklab, var(--qs-primary) 10%, transparent); }
+  .chip-brand { color: var(--qs-accent-ink); background: color-mix(in oklab, var(--qs-primary) 10%, transparent); }
 
   /* ---------- buttons --------------------------------------------- */
 

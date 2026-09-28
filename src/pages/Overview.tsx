@@ -23,7 +23,7 @@ export function OverviewPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <div className="animate-fade-up">
-        <p className="micro text-primary">PS 26141 · Blockchain &amp; Cybersecurity</p>
+        <p className="micro text-accent-ink">PS 26141 · Blockchain &amp; Cybersecurity</p>
         <h1 className="mt-3 font-display text-[28px] leading-[1.15] font-semibold text-on-bg">
           Quantum-inspired threat detection for digital signatures
         </h1>

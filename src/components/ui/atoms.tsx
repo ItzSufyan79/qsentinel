@@ -302,7 +302,7 @@ export function DataCard({
 }) {
   const toneText =
     tone === "pass"
-      ? "text-pass"
+      ? "text-pass-ink"
       : tone === "fail"
         ? "text-fail"
         : tone === "brand"
@@ -433,7 +433,7 @@ export function ComparisonBar({
       <div className="space-y-2.5">
         {[
           { v: left, name: leftLabel, bar: "var(--qs-primary)", text: "text-accent-ink" },
-          { v: right, name: rightLabel, bar: "var(--qs-secondary)", text: "text-pass" },
+          { v: right, name: rightLabel, bar: "var(--qs-secondary)", text: "text-pass-ink" },
         ].map((row) => (
           <div key={row.name}>
             <div className="mb-1 flex items-baseline justify-between gap-2">
