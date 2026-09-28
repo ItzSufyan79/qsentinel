@@ -30,10 +30,14 @@
   /* pass green is a fill; its foreground flips light/dark with the theme */
   --qs-on-pass: #2a241e;
   /* pass text on the light pass-tint chip — a darker sage that clears AA */
-  --qs-pass-ink: #5f6b52;
+  --qs-pass-ink: #56604a;
   /* alert text: the locked #A8493A already clears AA on cream, and dark mode
      lifts it because the same tone does not clear AA on a dark surface */
   --qs-fail-ink: #a8493a;
+
+  /* heatmap failed-bag ✕: light theme's heat-fail (46% fail over cream) is too
+     pale for a light glyph, so it flips — dark ink in light, light ink in dark */
+  --qs-heat-ink: var(--qs-on-bg);
 
   /* surfaces */
   --qs-bg: #f6efe7;
@@ -80,6 +84,11 @@
   --qs-warn-tint: color-mix(in oklab, var(--qs-warn) 12%, transparent);
   --qs-pending: #6e6355;
   --qs-pending-tint: color-mix(in oklab, var(--qs-pending) 12%, transparent);
+
+  /* 63-bag heatmap ramp — mixed against the surface, so it inherits theme */
+  --heat-clean: color-mix(in oklab, var(--qs-pass) 34%, var(--qs-bg));
+  --heat-mid: color-mix(in oklab, var(--qs-warn) 34%, var(--qs-bg));
+  --heat-fail: color-mix(in oklab, var(--qs-fail) 46%, var(--qs-bg));
 
   /* motion — scaled globally by the fast-forward control */
   --motion-scale: 1;
@@ -134,6 +143,9 @@
   --qs-pass: #a8b89a;
   --qs-warn: #e0a84a;
   --qs-pending: #a89a88;
+
+  /* dark heat-fail is a deep red, so the ✕ glyph is light there */
+  --qs-heat-ink: #fff4ea;
 }
 
 @theme inline {
@@ -533,6 +545,564 @@
     background-size: 22px 22px;
     background-position: center;
   }
+
+  /* ---------- glossary tooltip (Term) ------------------------------ */
+
+  .term {
+    position: relative;
+    display: inline-block;
+    cursor: help;
+  }
+
+  .term-label {
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 3px;
+    text-decoration-color: var(--qs-n-400);
+  }
+
+  .term:hover .term-label,
+  .term:focus-within .term-label {
+    color: var(--qs-accent-ink);
+  }
+
+  .term-pop {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    z-index: 40;
+    width: max-content;
+    max-width: 280px;
+    padding: 0.6rem 0.75rem;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.5;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--qs-on-surface);
+    background: var(--qs-surface);
+    border: 1px solid var(--qs-outline-strong);
+    border-radius: var(--qs-r);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.16);
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+    pointer-events: none;
+    transition: opacity var(--dur-fast) linear, transform var(--dur-fast) var(--ease-out);
+  }
+
+  .term-pop::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: var(--qs-outline-strong);
+  }
+
+  .term:hover .term-pop,
+  .term:focus-within .term-pop {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* ---------- locked parameter chip (LockChip) --------------------- */
+
+  .lock-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    border: 1px dashed var(--qs-outline-strong);
+    border-radius: var(--qs-r-sm);
+    background: var(--qs-surface-2);
+    padding: 0.35rem 0.6rem;
+    color: var(--qs-n-600);
+  }
+
+  .lock-chip .lock-chip-label {
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--qs-n-500);
+  }
+
+  .lock-chip .lock-chip-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--qs-ink);
+  }
+
+  /* ---------- caption block (report 7.6) --------------------------- */
+
+  .caption-block {
+    border-top: 1px solid var(--qs-outline);
+    margin-top: 1.1rem;
+    padding-top: 0.7rem;
+  }
+
+  .caption-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .caption-kicker {
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--qs-n-500);
+  }
+
+  .caption-grid {
+    display: grid;
+    gap: 0.6rem 1.2rem;
+    margin-top: 0.7rem;
+  }
+
+  @media (min-width: 768px) {
+    .caption-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  .caption-grid dt {
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--qs-n-500);
+  }
+
+  .caption-grid dd {
+    margin-top: 0.2rem;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--qs-n-600);
+  }
+
+  .num-run {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--qs-ink);
+  }
+
+  /* ---------- "not reached" note (report 3.4) ---------------------- */
+
+  .not-run {
+    border-style: dashed;
+    border-color: var(--qs-outline-strong);
+  }
+
+  /* ---------- stage stepper (report 6.1) --------------------------- */
+
+  .qs-stepper {
+    display: flex;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    gap: 0.4rem;
+  }
+
+  .qs-stepper li {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  .qs-step-num {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 26px;
+    height: 26px;
+    border-radius: var(--qs-r-sm);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--qs-n-300);
+    color: var(--qs-n-700);
+  }
+
+  .qs-stepper li.active .qs-step-num {
+    background: var(--qs-primary);
+    color: var(--qs-on-primary);
+  }
+
+  .qs-stepper li.done .qs-step-num {
+    background: var(--qs-pass);
+    color: var(--qs-on-pass);
+  }
+
+  .qs-stepper li.locked .qs-step-num {
+    background: var(--qs-surface-2);
+    color: var(--qs-n-500);
+    border: 1px dashed var(--qs-outline-strong);
+  }
+
+  .qs-step-label {
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--qs-n-600);
+  }
+
+  .qs-stepper li.active .qs-step-label {
+    color: var(--qs-ink);
+  }
+
+  .qs-stepper li.locked .qs-step-label {
+    color: var(--qs-n-500);
+  }
+
+  .qs-step-label em {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 400;
+    font-style: italic;
+    letter-spacing: 0;
+    text-transform: none;
+    opacity: 0.7;
+  }
+
+  .qs-step-line {
+    flex: 1 1 18px;
+    min-width: 12px;
+    max-width: 44px;
+    height: 1px;
+    background: var(--qs-n-300);
+  }
+
+  @media (max-width: 767px) {
+    .qs-step-label {
+      display: none;
+    }
+    .qs-step-line {
+      flex-basis: 14px;
+    }
+  }
+
+  /* ---------- gauges ----------------------------------------------- */
+
+  .gauge {
+    margin: 0;
+  }
+
+  .gauge svg {
+    display: block;
+    width: 100%;
+    max-width: 260px;
+  }
+
+  .gauge figcaption {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin-top: 0.4rem;
+  }
+
+  .gauge figcaption .num {
+    font-size: 20px;
+    font-weight: 600;
+  }
+
+  .gauge-text {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    fill: var(--qs-n-500);
+  }
+
+  .gauge-text.dim {
+    fill: var(--qs-n-400);
+  }
+
+  .dim {
+    opacity: 0.55;
+  }
+
+  /* ---------- severity (0–10 ticks) -------------------------------- */
+
+  .severity {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.45rem;
+  }
+
+  .severity-ticks {
+    display: flex;
+    gap: 3px;
+  }
+
+  .severity-tick {
+    display: block;
+    width: 14px;
+    height: 8px;
+    border-radius: 1px;
+  }
+
+  .severity-label {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--qs-ink);
+  }
+
+  /* ---------- drawer (glossary slide-over) ------------------------- */
+
+  .drawer-root {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .drawer-root.drawer-open {
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .drawer-backdrop {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    background: rgb(0 0 0 / 0.42);
+    border: none;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity var(--dur-med) linear;
+  }
+
+  .drawer-root.drawer-open .drawer-backdrop {
+    opacity: 1;
+  }
+
+  .drawer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    width: min(420px, 94vw);
+    background: var(--qs-surface);
+    border-left: 1px solid var(--qs-outline);
+    transform: translateX(100%);
+    transition: transform var(--dur-med) var(--ease-out);
+  }
+
+  .drawer-root.drawer-open .drawer {
+    transform: translateX(0);
+  }
+
+  .drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    border-top: 1px solid var(--qs-outline);
+  }
+
+  /* ---------- 63-bag heatmap --------------------------------------- */
+
+  .heat-grid {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    gap: 4px;
+  }
+
+  .heat-cell {
+    position: relative;
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1;
+    border-radius: var(--qs-r-sm);
+    border: 1px solid color-mix(in oklab, var(--qs-n-400) 25%, transparent);
+  }
+
+  .heat-num {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--qs-on-bg);
+    opacity: 0.85;
+  }
+
+  .heat-x {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--qs-heat-ink);
+  }
+
+  .heat-pin {
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--qs-fail);
+    border: 1.5px solid var(--qs-surface);
+  }
+
+  /* ---------- topology canvas (report 6.2) ------------------------- */
+
+  .topology {
+    margin: 0;
+  }
+
+  .topo-name {
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 600;
+    fill: var(--qs-ink);
+  }
+
+  .topo-role {
+    font-family: var(--font-display);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    fill: var(--qs-n-500);
+  }
+
+  .topo-eve {
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    fill: var(--qs-fail);
+  }
+
+  .topo-tap {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    fill: var(--qs-n-500);
+  }
+
+  .topo-label {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    fill: var(--qs-n-500);
+  }
+
+  .topology-caption {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.6rem;
+  }
+
+  /* ---------- form controls ---------------------------------------- */
+
+  .qs-input {
+    width: 100%;
+    background: var(--qs-bg);
+    border: 1px solid var(--qs-outline-strong);
+    border-radius: var(--qs-r);
+    padding: 0.55rem 0.75rem;
+    font-size: 14px;
+    color: var(--qs-ink);
+  }
+
+  .qs-input:focus {
+    outline: 2px solid var(--qs-primary);
+    outline-offset: 1px;
+    border-color: transparent;
+  }
+
+  .qs-input::placeholder {
+    color: var(--qs-n-400);
+  }
+
+  .qs-input-sm {
+    padding-block: 0.35rem;
+    font-size: 13px;
+  }
+
+  .qs-select {
+    background: var(--qs-bg);
+    border: 1px solid var(--qs-outline-strong);
+    border-radius: var(--qs-r);
+    padding: 0.3rem 0.5rem;
+    font-size: 12px;
+    color: var(--qs-ink);
+    cursor: pointer;
+  }
+
+  .qs-select:focus {
+    outline: 2px solid var(--qs-primary);
+    outline-offset: 1px;
+  }
+
+  .qs-radio-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    border: 1px solid var(--qs-outline);
+    border-radius: var(--qs-r);
+    padding: 0.6rem 0.75rem;
+    font-size: 14px;
+    color: var(--qs-on-surface);
+    cursor: pointer;
+    transition: border-color var(--dur-fast) linear, background-color var(--dur-fast) linear;
+  }
+
+  .qs-radio-row.qs-radio-on {
+    border-color: var(--qs-primary);
+    background: color-mix(in oklab, var(--qs-primary) 8%, transparent);
+  }
+
+  .qs-radio-row input[type="radio"] {
+    accent-color: var(--qs-primary);
+    margin-top: 3px;
+  }
+
+  .qs-slider {
+    width: 100%;
+    accent-color: var(--qs-primary);
+    cursor: pointer;
+  }
+
+  .card-selected {
+    border-color: var(--qs-primary);
+    box-shadow: inset 0 0 0 1px var(--qs-primary);
+  }
+
+  .step-section {
+    transition: opacity var(--dur-fast) linear;
+  }
+
+  .qs-disabled {
+    opacity: 0.55;
+    pointer-events: none;
+  }
+
+  .btn-lg {
+    padding: 0.85rem 1.25rem;
+    font-size: 14px;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid color-mix(in oklab, var(--qs-on-primary) 40%, transparent);
+    border-top-color: var(--qs-on-primary);
+    animation: qs-spin 0.7s linear infinite;
+  }
 }
 
 @layer utilities {
@@ -609,6 +1179,10 @@
 @keyframes qs-scan {
   from { left: -12%; }
   to { left: 108%; }
+}
+
+@keyframes qs-spin {
+  to { transform: rotate(360deg); }
 }
 
 @keyframes qs-seek {

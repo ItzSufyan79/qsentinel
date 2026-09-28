@@ -18,9 +18,10 @@ const URL_BASE = process.env.AUDIT_URL ?? "http://127.0.0.1:4173";
 const PORT = 9333;
 const OUT_DIR = join(process.cwd(), ".audit");
 
-/** Drive the flow by clicking through primary actions and fast-forwarding. */
-const DEEP = process.argv.includes("--deep");
-/** Dark is the shipped default, so it has to be measurable too. */
+/**
+ * Drive the flow by clicking through primary actions and fast-forwarding.
+ * Dark is the shipped default, so it has to be measurable too.
+ */
 const THEME = process.argv.includes("--dark") ? "dark" : "light";
 /**
  * Force the theme and stop every colour transition before measuring: a
@@ -48,32 +49,11 @@ const CURRENT_PAGE = `(() => {
   return h1 ? h1.textContent.trim() : '(no page)';
 })()`;
 
-const LOCATION = "location.pathname";
-
-/** Picks an attack card by its label so a disputed run can be audited. */
-const PICK_ATTACK = `(() => {
-  const want = (${JSON.stringify("Collusion")}).toLowerCase();
-  const btn = [...document.querySelectorAll('button[aria-pressed]')]
-    .find((b) => (b.textContent || '').toLowerCase().includes(want));
-  if (!btn) return 'no-option';
-  btn.click();
-  return 'picked';
-})()`;
-
-const SUBMIT = `(() => {
-  const btn = [...document.querySelectorAll('button.btn-primary')]
-    .find((b) => !b.disabled && b.offsetParent !== null && /start simulation/i.test(b.textContent || ''));
-  if (!btn) return 'no-button';
-  btn.click();
-  return 'submitted';
-})()`;
-
 /** The static routes, all reachable without running a simulation. */
 const STATIC_ROUTES: { path: string; label: string }[] = [
   { path: "/", label: "overview" },
-  { path: "/simulate/new", label: "new-simulation" },
-  { path: "/dashboard", label: "dashboard" },
-  { path: "/log", label: "event-log" },
+  { path: "/simulate", label: "new-simulation" },
+  { path: "/history", label: "history" },
 ];
 
 const VIEWPORTS = [
@@ -87,21 +67,72 @@ const PROBE = `(() => {
   const res = { overflow: [], tinyText: [], lowContrast: [], clipped: [], tall: [] };
 
   const ch = (n) => (n >= '0' && n <= '9') || n === '.' || n === '-';
-  const parse = (s) => {
-    const m = (s || '').match(/-?[0-9.]+/g) || [];
-    return m.slice(0, 4).map(Number);
+  const PI = Math.PI;
+  const oklab2srgb = (L, a, b) => {
+    const l = L + 0.3963377774 * a + 0.2158037573 * b;
+    const m = L - 0.1055613458 * a - 0.0638541728 * b;
+    const s = L - 0.0894841775 * a - 1.2914855480 * b;
+    const l3 = l * l * l, m3 = m * m * m, s3 = s * s * s;
+    const cl = (c) => Math.min(1, Math.max(0, c));
+    const lin = [cl(4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3),
+                 cl(-1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3),
+                 cl(-0.0041960863 * l3 - 0.7034186147 * m3 + 1.7076147010 * s3)];
+    return lin.map((c) => 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055));
+  };
+  const hsl2srgb = (h, s, l) => {
+    h = ((h % 360) + 360) % 360; s /= 100; l /= 100;
+    const f = (n) => {
+      const k = (n + h / 30) % 12;
+      const a = s * Math.min(l, 1 - l);
+      return 255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)));
+    };
+    return [f(0), f(8), f(4)];
+  };
+  // Computed colors for color-mix(in oklab, ...) serialize as oklab(L a b)
+  // or oklch(L C h), and translucent fills keep their alpha — so return the
+  // sRGB triple plus alpha, letting bgOf() composite it over the real page.
+  const toColor = (s) => {
+    const str = (s || '').trim();
+    if (!str || str === 'none') return null;
+    const nums = (str.match(/-?[0-9.]+/g) || []).map(Number);
+    if (nums.length < 3) return null;
+    const a = nums.length > 3 ? nums[3] : 1;
+    if (a <= 0) return null;
+    let r, g, b;
+    if (str.startsWith('oklch')) {
+      const [L, C, H] = nums;
+      [r, g, b] = oklab2srgb(L, C * Math.cos((H * PI) / 180), C * Math.sin((H * PI) / 180));
+    } else if (str.startsWith('oklab')) {
+      [r, g, b] = oklab2srgb(nums[0], nums[1], nums[2]);
+    } else if (str.startsWith('hsl')) {
+      [r, g, b] = hsl2srgb(nums[0], nums[1], nums[2]);
+    } else if (str.includes('%')) {
+      r = nums[0] * 2.55; g = nums[1] * 2.55; b = nums[2] * 2.55;
+    } else {
+      r = nums[0]; g = nums[1]; b = nums[2];
+    }
+    return { r, g, b, a };
   };
   const srgb = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
   const lum = ([r, g, b]) => 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
 
+  /** Composite the translucent backgrounds from the leaf upward, then over white. */
   const bgOf = (el) => {
-    let n = el;
-    while (n && n !== document.documentElement) {
-      const p = parse(getComputedStyle(n).backgroundColor);
-      if (p.length === 3 || (p.length >= 3 && p[3] > 0.5)) return p.slice(0, 3);
-      n = n.parentElement;
+    let acc = null;
+    for (let n = el; n && n !== document.documentElement; n = n.parentElement) {
+      const c = toColor(getComputedStyle(n).backgroundColor);
+      if (!c) continue;
+      if (c.a === 1) return [Math.round(c.r), Math.round(c.g), Math.round(c.b)];
+      acc = acc === null
+        ? { r: c.r, g: c.g, b: c.b, a: c.a }
+        : { r: c.a * c.r + (1 - c.a) * acc.r, g: c.a * c.g + (1 - c.a) * acc.g, b: c.a * c.b + (1 - c.a) * acc.b, a: 1 };
     }
-    return [255, 255, 255];
+    if (!acc) return [255, 255, 255];
+    return [
+      Math.round(acc.a * acc.r + (1 - acc.a) * 255),
+      Math.round(acc.a * acc.g + (1 - acc.a) * 255),
+      Math.round(acc.a * acc.b + (1 - acc.a) * 255),
+    ];
   };
 
   /** Tailwind's .sr-only and equivalents: present for screen readers, not eyes. */
@@ -158,8 +189,9 @@ const PROBE = `(() => {
 
     if (disabled(el)) continue;
 
-    const fg = parse(cs.color);
-    if (fg.length >= 3) {
+    const fgColor = toColor(cs.color);
+    if (fgColor) {
+      const fg = [Math.round(fgColor.r), Math.round(fgColor.g), Math.round(fgColor.b)];
       const bg = bgOf(el);
       const l1 = lum(fg), l2 = lum(bg);
       const ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
@@ -324,44 +356,16 @@ async function main() {
         width: vp.width, height: vp.height, deviceScaleFactor: 1, mobile: vp.width < 500,
       }, sessionId);
 
-      /* ---- create one real run, so the live/result/arbitration
-              routes have a run id to be audited against ---- */
-      let runId = "";
-      await browser.send("Page.navigate", { url: `${URL_BASE}/simulate/new` }, sessionId);
-      await sleep(2000);
-      await browser.send("Runtime.evaluate", { expression: SET_THEME, returnByValue: true }, sessionId);
-      await evalString(browser, sessionId, PICK_ATTACK);
-      await sleep(500);
-      // the collusion scenario needs at least two verifiers
-      await browser.send("Runtime.evaluate", {
-        expression: `(() => {
-          const btn = document.querySelector('button[aria-label="2 verifiers"]');
-          if (!btn) return 'no-stepper';
-          btn.click();
-          return 'verifiers=2';
-        })()`,
-        returnByValue: true,
-      }, sessionId);
-      await sleep(400);
-      await evalString(browser, sessionId, SUBMIT);
-      // the app navigates to the live run once the backend accepts it
-      for (let i = 0; i < 30 && !runId; i++) {
-        await sleep(300);
-        const path = await evalString(browser, sessionId, LOCATION);
-        const m = path.match(/\/simulate\/run\/([^/]+)/);
-        if (m) runId = m[1]!;
-      }
-      if (!runId && DEEP) console.log(`   ! could not start a run at ${vp.name}`);
-
+      /* Every route below is reached via a full Page.navigate, which reboots
+          the mock (it is in-memory). Runs created on this page do not survive
+          a reload, so the live/result routes are audited against baked
+          fixtures: e4f5a1 is a REJECTED forgery (densest result page) and
+          honest7 is an ACCEPTED run. */
       const routes = [
         ...STATIC_ROUTES,
-        ...(runId
-          ? [
-              { path: `/simulate/run/${runId}`, label: "live-run" },
-              { path: `/simulate/run/${runId}/result`, label: "results" },
-              { path: `/simulate/run/${runId}/arbitration`, label: "arbitration" },
-            ]
-          : []),
+        { path: "/run/e4f5a1", label: "live-run" },
+        { path: "/results/e4f5a1", label: "results" },
+        { path: "/results/honest7", label: "results-accepted" },
       ];
 
       for (const route of routes) {

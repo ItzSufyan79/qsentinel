@@ -19,5 +19,5 @@ export const api: QdsApi = mode === "http" ? httpApi : mockApi;
 
 export const API_MODE = mode;
 
-export { ApiError, ROUTES, type QdsApi, type RunContext } from "./contract";
+export { ApiError, ROUTES, SYSTEM_PARAMS, type QdsApi, type RunContext } from "./contract";
 export * from "./types";

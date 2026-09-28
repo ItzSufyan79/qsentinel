@@ -4,7 +4,7 @@
  * a backend enum to the words a reader needs.
  */
 
-import type { DetectionMechanism } from "../api/types";
+import { STAGES, type StageId } from "../api/types";
 
 /** A rate the backend sent as a fraction, shown as a percentage. */
 export function pct(value: number, digits = 1): string {
@@ -23,15 +23,14 @@ export function probability(value: number): string {
   return value.toExponential(1);
 }
 
-const MECHANISM: Record<DetectionMechanism, string> = {
-  "quantum-error-rate": "Quantum error-rate check",
-  "classical-mac": "Classical MAC check",
-  "nonce-session-validation": "Nonce / session validation",
-  "verifier-cross-check": "Verifier cross-check mismatch",
-  none: "Not flagged",
-};
+/** "02" … "06" badge for a stage. */
+export function stageNum(id: StageId): string {
+  return STAGES.find((s) => s.id === id)?.num.toString().padStart(2, "0") ?? id;
+}
 
-export const mechanismLabel = (m: DetectionMechanism): string => MECHANISM[m];
+export function stageLabel(id: StageId): string {
+  return STAGES.find((s) => s.id === id)?.label ?? id;
+}
 
 /** "2026-09-28" -> "28 Sep 2026", for date filters and log rows. */
 export function shortDate(iso: string): string {

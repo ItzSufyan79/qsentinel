@@ -1,11 +1,12 @@
-export const PHASES = [
-  { id: "keygen", label: "Key Generation" },
-  { id: "distribution", label: "Distribution" },
-  { id: "signing", label: "Signing" },
-  { id: "verification", label: "Verification" },
-  { id: "result", label: "Result" },
-] as const;
+import { STAGES, type StageId } from "../api/types";
 
-export type PhaseId = (typeof PHASES)[number]["id"];
+/** Stepper config for the live pipeline (report 6.1), driven by the run's stage. */
+export const STAGE_CONFIG = STAGES.map((s) => ({
+  id: s.id,
+  num: s.num.toString().padStart(2, "0"),
+  label: s.label,
+}));
 
-export const PHASE_ORDER: PhaseId[] = PHASES.map((p) => p.id);
+export function stageFromId(id: StageId) {
+  return STAGE_CONFIG.find((s) => s.id === id);
+}

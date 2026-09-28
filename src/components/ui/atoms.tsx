@@ -1,45 +1,60 @@
 /**
  * Reusable component inventory — UI/UX design report, section 2.4.
  *
- * Every visual in the app is built from these. Nothing ad-hoc.
- *
- * Icon set is Tabler (outline). The mapping is fixed by the spec:
- *   qubit/quantum state      -> IconAtom
- *   classical channel / auth  -> IconLock
- *   verification passed       -> IconShieldCheck   (teal)
- *   attack detected/rejected  -> IconAlertTriangle (red)
- *   verifier                  -> IconEye
- *   arbiter / dispute         -> IconScale
- *   live activity             -> IconActivity
- *   analytics / history       -> IconChartBar
- *   event log                 -> IconListDetails
- * No decorative icons. If a concept has no mapping, it gets no icon.
+ * Every visual in the app is built from these. Icon set is Tabler (outline),
+ * fixed concept mapping, no decorative icons. Every pass/fail pairs color with
+ * an icon and a word — never color alone.
  */
 
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { animate } from "animejs";
 import {
   IconActivity,
   IconAlertTriangle,
   IconArrowRight,
+  IconArrowsDiff,
   IconAtom,
+  IconBook,
+  IconBug,
   IconChartBar,
   IconCircleCheck,
+  IconCircleX,
   IconClock,
+  IconClipboard,
   IconCpu,
   IconDownload,
   IconEye,
   IconFlask,
+  IconGridDots,
+  IconHistory,
+  IconList,
   IconListDetails,
   IconLock,
+  IconLockQuestion,
+  IconMoodCheck,
+  IconPlayerPause,
+  IconPlayerPlay,
+  IconPlayerSkipForward,
+  IconPlayerTrackNext,
+  IconPlayerTrackPrev,
+  IconRepeat,
   IconScale,
   IconSearch,
+  IconSettings,
   IconShieldCheck,
+  IconSignature,
+  IconSparkles,
+  IconTools,
+  IconUpload,
+  IconUserCheck,
 } from "@tabler/icons-react";
 import type { IconName } from "../../lib/iconNames";
-import { mechanismLabel } from "../../lib/formatting";
-import { PHASES, type PhaseId } from "../../lib/phases";
-import type { DetectionMechanism } from "../../api/types";
 
 export type { IconName };
 
@@ -63,7 +78,30 @@ const ICONS: Record<IconName, (p: { size?: number; className?: string }) => Reac
   download: (p) => <IconDownload {...p} />,
   "arrow-right": (p) => <IconArrowRight {...p} />,
   "circle-check": (p) => <IconCircleCheck {...p} />,
+  "circle-x": (p) => <IconCircleX {...p} />,
   cpu: (p) => <IconCpu {...p} />,
+  "arrows-diff": (p) => <IconArrowsDiff {...p} />,
+  "grid-dots": (p) => <IconGridDots {...p} />,
+  repeat: (p) => <IconRepeat {...p} />,
+  signature: (p) => <IconSignature {...p} />,
+  history: (p) => <IconHistory {...p} />,
+  "user-check": (p) => <IconUserCheck {...p} />,
+  "lock-question": (p) => <IconLockQuestion {...p} />,
+  book: (p) => <IconBook {...p} />,
+  "magnifying-glass": (p) => <IconSearch {...p} />,
+  "player-play": (p) => <IconPlayerPlay {...p} />,
+  "player-pause": (p) => <IconPlayerPause {...p} />,
+  "player-skip-forward": (p) => <IconPlayerSkipForward {...p} />,
+  "player-track-next": (p) => <IconPlayerTrackNext {...p} />,
+  "player-track-prev": (p) => <IconPlayerTrackPrev {...p} />,
+  settings: (p) => <IconSettings {...p} />,
+  bug: (p) => <IconBug {...p} />,
+  list: (p) => <IconList {...p} />,
+  upload: (p) => <IconUpload {...p} />,
+  clipboard: (p) => <IconClipboard {...p} />,
+  "mood-check": (p) => <IconMoodCheck {...p} />,
+  sparkles: (p) => <IconSparkles {...p} />,
+  tools: (p) => <IconTools {...p} />,
 };
 
 export function Icon({
@@ -79,23 +117,24 @@ export function Icon({
 }
 
 /* ------------------------------------------------------------------ */
-/*  StatusBadge — pill label, coloured by state                       */
+/*  StatusBadge — pill label, coloured by state                        */
 /* ------------------------------------------------------------------ */
 
-export type BadgeTone = "honest" | "attack" | "pending" | "disputed" | "neutral";
+export type BadgeTone = "honest" | "attack" | "pending" | "warn" | "neutral" | "brand";
 
 const BADGE_TONE: Record<BadgeTone, string> = {
   honest: "chip-pass",
   attack: "chip-fail",
   pending: "chip-pending",
-  disputed: "chip-brand",
+  warn: "chip-warn",
   neutral: "chip-neutral",
+  brand: "chip-brand",
 };
 
 const BADGE_ICON: Partial<Record<BadgeTone, IconName>> = {
-  honest: "shield-check",
-  attack: "alert-triangle",
-  disputed: "scale",
+  honest: "circle-check",
+  attack: "circle-x",
+  warn: "alert-triangle",
 };
 
 export function StatusBadge({
@@ -114,6 +153,38 @@ export function StatusBadge({
       {children}
     </span>
   );
+}
+
+/** Pass/fail glyph plus word — the colour is never the only signal. */
+export function Outcome({
+  ok,
+  children,
+}: {
+  ok: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <span className={`chip ${ok ? "chip-pass" : "chip-fail"}`}>
+      <Icon name={ok ? "circle-check" : "circle-x"} size={13} />
+      {children}
+    </span>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Panel — the hairline card                                           */
+/* ------------------------------------------------------------------ */
+
+export function Panel({
+  children,
+  className = "",
+  muted = false,
+}: {
+  children: ReactNode;
+  className?: string;
+  muted?: boolean;
+}) {
+  return <div className={`${muted ? "card-muted" : "card"} ${className}`}>{children}</div>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -146,32 +217,16 @@ export function SectionHead({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Panel — the hairline card                                           */
-/* ------------------------------------------------------------------ */
-
-export function Panel({
-  children,
-  className = "",
-  muted = false,
-}: {
-  children: ReactNode;
-  className?: string;
-  muted?: boolean;
-}) {
-  return <div className={`${muted ? "card-muted" : "card"} ${className}`}>{children}</div>;
-}
-
-/* ------------------------------------------------------------------ */
 /*  Banner — status strip. `accent` paints border/tint, `ink` the text */
 /* ------------------------------------------------------------------ */
 
 type Tone = "pass" | "fail" | "warn" | "pending" | "neutral" | "brand";
 
 const BANNER: Record<Tone, { accent: string; ink: string; icon?: IconName }> = {
-  pass: { accent: "var(--qs-pass)", ink: "var(--qs-pass)", icon: "shield-check" },
-  fail: { accent: "var(--qs-fail)", ink: "var(--qs-fail)", icon: "alert-triangle" },
+  pass: { accent: "var(--qs-pass)", ink: "var(--qs-pass-ink)", icon: "circle-check" },
+  fail: { accent: "var(--qs-fail)", ink: "var(--qs-fail-ink)", icon: "circle-x" },
   warn: { accent: "var(--qs-warn)", ink: "var(--qs-warn)", icon: "alert-triangle" },
-  pending: { accent: "var(--qs-pending)", ink: "var(--qs-pending)" },
+  pending: { accent: "var(--qs-pending)", ink: "var(--qs-pending)", icon: "clock" },
   neutral: { accent: "var(--qs-n-400)", ink: "var(--qs-n-500)", icon: "list-details" },
   brand: { accent: "var(--qs-primary)", ink: "var(--qs-accent-ink)", icon: "atom" },
 };
@@ -181,20 +236,16 @@ export function Banner({
   title,
   children,
   className = "",
-  animate = false,
 }: {
   tone: Tone;
   title: string;
   children?: ReactNode;
   className?: string;
-  animate?: boolean;
 }) {
   const style = BANNER[tone];
   return (
     <div
-      className={`flex flex-wrap items-center gap-x-4 gap-y-3 border py-3 pr-4 pl-3.5 ${
-        animate ? "animate-pop" : ""
-      } ${className}`}
+      className={`flex flex-wrap items-center gap-x-4 gap-y-3 border py-3 pr-4 pl-3.5 ${className}`}
       style={{
         borderColor: style.accent,
         background: `color-mix(in oklab, ${style.accent} 6%, transparent)`,
@@ -222,89 +273,77 @@ export function Banner({
 }
 
 /* ------------------------------------------------------------------ */
-/*  PhaseStepper — 5 nodes: Key Gen → Distribution → Signing →         */
-/*  Verification → Result                                              */
+/*  Tooltip term — dotted underline + glossary popover. First use of any*/
+/*  jargon gets one (report principle 6).                               */
 /* ------------------------------------------------------------------ */
 
-
-
-export function PhaseStepper({
-  current,
-  maxReached,
+export function Term({
+  term,
+  children,
 }: {
-  current: PhaseId;
-  maxReached: PhaseId;
+  term: string;
+  children: ReactNode;
 }) {
-  const currentIdx = PHASES.findIndex((p) => p.id === current);
-  const maxIdx = PHASES.findIndex((p) => p.id === maxReached);
+  const id = useId();
   return (
-    <ol className="flex items-start gap-0" aria-label="Simulation phases">
-      {PHASES.map((phase, i) => {
-        const state =
-          i < maxIdx ? "done" : i === currentIdx ? "active" : "pending";
-        return (
-          <li key={phase.id} className="flex min-w-0 flex-1 items-start" aria-label={phase.label}>
-            <div
-              className="flex min-w-0 flex-col items-center gap-2"
-              aria-current={i === currentIdx ? "step" : undefined}
-            >
-              <span
-                className={`grid size-7 shrink-0 place-items-center rounded-[var(--qs-r-sm)] border font-mono text-[12px] font-semibold ${
-                  state === "done"
-                    ? "border-pass bg-pass text-on-pass"
-                    : state === "active"
-                      ? "border-primary bg-primary text-on-primary"
-                      : "border-outline-strong bg-surface text-n-500"
-                }`}
-              >
-                {state === "done" ? <Icon name="shield-check" size={14} /> : i + 1}
-              </span>
-              {/* the labels do not fit five-across on a phone; the stepper's
-                  aria-label and the live status line carry the same words */}
-              <span
-                className={`display hidden text-center text-[12px] tracking-[0.04em] uppercase sm:block ${
-                  state === "active"
-                    ? "font-semibold text-on-bg"
-                    : state === "done"
-                      ? "text-n-600"
-                      : "text-n-500"
-                }`}
-              >
-                {phase.label}
-              </span>
-            </div>
-            {i < PHASES.length - 1 && (
-              <span
-                aria-hidden
-                className={`mx-1 mt-3.5 h-px flex-1 sm:mx-2 ${
-                  i < maxIdx ? "bg-pass" : "bg-outline"
-                }`}
-              />
-            )}
-          </li>
-        );
-      })}
-    </ol>
+    <span className="term" data-term={id}>
+      <span className="term-label" tabIndex={0} aria-describedby={id}>
+        {term}
+      </span>
+      <span role="tooltip" id={id} className="term-pop">
+        {children}
+      </span>
+    </span>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/*  DataCard — labelled numeric stat. Value in Plex Mono, label in     */
-/*  Plex Sans Condensed.                                               */
+/*  LockChip — a read-only, backend-fixed parameter (report 5.5)        */
 /* ------------------------------------------------------------------ */
 
-export function DataCard({
+export function LockChip({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <span className="lock-chip" title="Fixed by the backend so the statistics stay valid.">
+      <Icon name="lock" size={12} />
+      <span className="display lock-chip-label">{label}</span>
+      <span className="num lock-chip-value">{value}</span>
+    </span>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  NotRun — the slim muted card for "panel not reached" (report 3.4)   */
+/* ------------------------------------------------------------------ */
+
+export function NotRun({
+  reason = "Not run — the session was rejected before quantum verification.",
+}: {
+  reason?: string;
+}) {
+  return (
+    <div className="card-muted not-run" role="note">
+      <Outcome ok={false}>Not run</Outcome>
+      <p className="caption-text mt-2">{reason}</p>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  MetricCard — label, big mono value, status chip (report 2.4)        */
+/* ------------------------------------------------------------------ */
+
+export function MetricCard({
   label,
   value,
   unit,
   tone = "neutral",
-  hint,
+  chip,
 }: {
   label: string;
   value: ReactNode;
   unit?: string;
   tone?: "neutral" | "pass" | "fail" | "brand";
-  hint?: string;
+  chip?: ReactNode;
 }) {
   const toneText =
     tone === "pass"
@@ -314,20 +353,21 @@ export function DataCard({
         : tone === "brand"
           ? "text-accent-ink"
           : "text-on-bg";
-  // numeric values count up; anything else renders as-is
   const numeric = typeof value === "number" ? value : null;
   return (
     <div className="card-muted p-4">
-      <p className="display text-[12px] tracking-[0.06em] text-n-500 uppercase">
-        {label}
-      </p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="display text-[12px] tracking-[0.06em] text-n-500 uppercase">
+          {label}
+        </p>
+        {chip}
+      </div>
       <p className={`num mt-2 text-[28px] leading-none font-semibold ${toneText}`}>
         {numeric !== null ? <CountUp value={numeric} /> : value}
         {unit && (
           <span className="ml-1 text-[14px] font-normal text-n-500">{unit}</span>
         )}
       </p>
-      {hint && <p className="mt-2 text-[13px] leading-snug text-n-500">{hint}</p>}
     </div>
   );
 }
@@ -338,17 +378,14 @@ function CountUp({ value }: { value: number }) {
   const current = useRef(0);
 
   useEffect(() => {
-    const from = current.current;
-    const state = { v: from };
+    const state = { v: current.current };
     const anim = animate(state, {
       v: value,
-      duration: 900,
+      duration: 700,
       ease: "outExpo",
       onUpdate: () => {
         current.current = state.v;
-        if (ref.current) {
-          ref.current.textContent = state.v.toFixed(3);
-        }
+        if (ref.current) ref.current.textContent = state.v.toFixed(3);
       },
     });
     return () => {
@@ -360,155 +397,231 @@ function CountUp({ value }: { value: number }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  ParamSlider — labelled slider with live numeric readout. `min`,      */
-/*  `max` and `step` come from the backend, never from this file.        */
+/*  CaptionBlock — the explainability spine (report 7.6): every card   */
+/*  answers "What am I looking at? How do I read it?" and "This run".   */
+/*  Open by default the first time; the choice is remembered per card.  */
 /* ------------------------------------------------------------------ */
 
-export function ParamSlider({
-  label,
-  value,
-  min,
-  max,
-  step = 1,
-  unit = "",
-  onChange,
-  disabled = false,
-  hint,
-  error,
-  format = (v: number) => String(v),
+export function CaptionBlock({
+  what,
+  how,
+  run,
+  more,
 }: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  unit?: string;
-  onChange: (v: number) => void;
-  disabled?: boolean;
-  hint?: string;
-  error?: string;
-  format?: (v: number) => string;
+  what: string;
+  how: string;
+  /** generated from THIS run's backend values */
+  run: string | null;
+  more?: string;
 }) {
   const id = useId();
-  const hintId = `${id}-hint`;
+  const [show, setShow] = useState(() => {
+    const saved = localStorage.getItem(`qs-caption:${id}`);
+    return saved === null ? true : saved === "1";
+  });
+  const [openMore, setOpenMore] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem(`qs-caption:${id}`, show ? "1" : "0");
+  }, [show, id]);
+
   return (
-    <div>
-      <div className="flex items-baseline justify-between gap-3">
-        <label
-          htmlFor={id}
-          className="display text-[13px] font-medium tracking-[0.04em] text-on-surface uppercase"
+    <div className="caption-block" data-open={show}>
+      <div className="caption-row">
+        <span className="display caption-kicker">Caption</span>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          aria-expanded={show}
+          onClick={() => setShow((v) => !v)}
         >
-          {label}
-        </label>
-        <span className="num text-[14px] font-semibold text-on-bg">
-          {format(value)}
-          {unit}
-        </span>
+          {show ? "Hide" : "Show"} caption
+        </button>
       </div>
-      <input
-        id={id}
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(Number(e.target.value))}
-        aria-describedby={hint || error ? hintId : undefined}
-        aria-invalid={error ? true : undefined}
-        className="mt-2 h-1.5 w-full cursor-pointer appearance-none rounded-full bg-n-200 accent-[var(--qs-primary)] disabled:cursor-not-allowed disabled:opacity-40"
-      />
-      <div className="mt-1.5 flex items-baseline justify-between gap-3">
-        <span className="num text-[12px] text-n-500">
-          {format(min)}
-          {unit}
-        </span>
-        <span className="num text-[12px] text-n-500">
-          {format(max)}
-          {unit}
-        </span>
-      </div>
-      {(hint || error) && (
-        <p
-          id={hintId}
-          className={`mt-1.5 text-[13px] ${error ? "text-fail-ink" : "text-n-500"}`}
-        >
-          {error ?? hint}
-        </p>
+      {show && (
+        <dl className="caption-grid">
+          <div>
+            <dt>What am I looking at?</dt>
+            <dd>{what}</dd>
+          </div>
+          <div>
+            <dt>How do I read it?</dt>
+            <dd>{how}</dd>
+          </div>
+          {run && (
+            <div>
+              <dt>This run</dt>
+              <dd className="num-run">{run}</dd>
+            </div>
+          )}
+        </dl>
       )}
+      {more && (
+        <button
+          type="button"
+          className="mt-2 text-[12px] font-medium text-accent-ink underline decoration-dotted underline-offset-4"
+          aria-expanded={openMore}
+          onClick={() => setOpenMore((v) => !v)}
+        >
+          {openMore ? "Hide" : "Tell me more"}
+        </button>
+      )}
+      {openMore && more && <p className="mt-2 text-[13px] leading-relaxed text-n-600">{more}</p>}
     </div>
   );
 }
 
-/** Verifier count is a small discrete choice, so it gets buttons not a slider. */
-export function CountStepper({
-  label,
-  value,
-  min,
-  max,
-  onChange,
-  disabled = false,
-  hint,
-  error,
-}: {
+/* ------------------------------------------------------------------ */
+/*  StageStepper — the 6-node live pipeline (report 6.1)                */
+/* ------------------------------------------------------------------ */
+
+export interface StepperNode {
+  id: string;
+  num: string;
   label: string;
-  value: number;
-  min: number;
-  max: number;
-  onChange: (v: number) => void;
-  disabled?: boolean;
-  hint?: string;
-  error?: string;
+  state: "pending" | "active" | "done" | "locked";
+}
+
+export function StageStepper({
+  nodes,
+  ariaLabel,
+}: {
+  nodes: StepperNode[];
+  ariaLabel: string;
 }) {
-  const hintId = useId();
   return (
-    <fieldset disabled={disabled}>
-      <legend className="display text-[13px] font-medium tracking-[0.04em] text-on-surface uppercase">
-        {label}
-      </legend>
-      <div className="mt-2 flex flex-wrap items-center gap-1.5" aria-describedby={hintId}>
-        {Array.from({ length: max - min + 1 }, (_, i) => min + i).map((n) => {
-          const active = n === value;
-          return (
-            <button
-              key={n}
-              type="button"
-              onClick={() => onChange(n)}
-              aria-pressed={active}
-              aria-label={`${n} verifier${n === 1 ? "" : "s"}`}
-              className={`num size-9 rounded-[var(--qs-r)] border text-[14px] font-semibold transition-colors ${
-                active
-                  ? "border-primary bg-primary text-on-primary"
-                  : "border-outline-strong bg-surface text-n-600 hover:border-outline-strong hover:text-on-bg"
-              }`}
-            >
-              {n}
-            </button>
-          );
-        })}
-        <span className="num ml-1 text-[12px] text-n-500">
-          {value} selected
-        </span>
-      </div>
-      {(hint || error) && (
-        <p id={hintId} className={`mt-1.5 text-[13px] ${error ? "text-fail-ink" : "text-n-500"}`}>
-          {error ?? hint}
-        </p>
-      )}
-    </fieldset>
+    <ol className="qs-stepper" aria-label={ariaLabel}>
+      {nodes.map((n, i) => (
+        <li key={n.id} className={n.state} aria-current={n.state === "active" ? "step" : undefined}>
+          <span className="qs-step-num">
+            {n.state === "locked" ? (
+              <Icon name="lock" size={13} />
+            ) : n.state === "done" ? (
+              <Icon name="circle-check" size={13} />
+            ) : (
+              n.num
+            )}
+          </span>
+          <span className="qs-step-label">
+            {n.label}
+            {n.state === "locked" && <em>Not reached</em>}
+          </span>
+          {i < nodes.length - 1 && <span className="qs-step-line" aria-hidden />}
+        </li>
+      ))}
+    </ol>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/*  ComparisonBar — n-bar comparison. Every value is backend-supplied;    */
-/*  the optional marker is the backend-derived threshold.                */
+/*  Gauge — fidelity (0–1 semicircle) and severity (0–10) bugs          */
+/* ------------------------------------------------------------------ */
+
+export function FidelityGauge({
+  value,
+  gate,
+  mark = 0.25,
+  status,
+}: {
+  value: number;
+  gate: number;
+  mark?: number;
+  status: "pass" | "fail" | "measuring";
+}) {
+  const color =
+    status === "fail"
+      ? "var(--qs-fail)"
+      : status === "pass"
+        ? "var(--qs-pass)"
+        : "var(--qs-pending)";
+  const ink =
+    status === "fail"
+      ? "var(--qs-fail-ink)"
+      : status === "pass"
+        ? "var(--qs-pass-ink)"
+        : "var(--qs-pending)";
+  const needle = Math.max(0.02, Math.min(0.98, value));
+  return (
+    <figure className="gauge" aria-label={`Fidelity F = ${value.toFixed(2)}`}>
+      <svg viewBox="0 0 220 120" role="img" aria-hidden="true">
+        <path d="M15 105 A 95 95 0 0 1 205 105" fill="none" stroke="var(--qs-n-200)" strokeWidth="14" strokeLinecap="butt" />
+        <path
+          d="M15 105 A 95 95 0 0 1 205 105"
+          fill="none"
+          stroke={color}
+          strokeWidth="14"
+          strokeLinecap="butt"
+          pathLength={1}
+          strokeDasharray={`${needle} 1`}
+        />
+        {/* 0.5 gate line */}
+        <line x1="110" y1="13" x2="110" y2="30" stroke="var(--qs-ink)" strokeWidth="2" />
+        <text x="110" y="46" textAnchor="middle" className="gauge-text">
+          gate {gate}
+        </text>
+        {/* 0.25 "no entanglement" marker */}
+        <line x1="62" y1="105" x2="62" y2="88" stroke="var(--qs-n-500)" strokeWidth="1.5" strokeDasharray="3 3" />
+        <text x="40" y="122" textAnchor="middle" className="gauge-text dim">
+          {mark} no entanglement
+        </text>
+        <text x="205" y="122" textAnchor="end" className="gauge-text">
+          1
+        </text>
+      </svg>
+      <figcaption>
+        <span className="num" style={{ color: ink }}>
+          F = {value.toFixed(2)}
+        </span>
+        {status === "fail" && <Outcome ok={false}>Failed</Outcome>}
+        {status === "pass" && <Outcome ok>Passed</Outcome>}
+      </figcaption>
+    </figure>
+  );
+}
+
+/** Severity 0–10 with a label; the three component bars are in Results. */
+export function SeverityGauge({ score }: { score: number }) {
+  const tone = score === 0 ? "pass" : score <= 3 ? "pending" : score <= 6 ? "warn" : "fail";
+  const color =
+    tone === "pass"
+      ? "var(--qs-pass)"
+      : tone === "pending"
+        ? "var(--qs-pending)"
+        : tone === "warn"
+          ? "var(--qs-warn)"
+          : "var(--qs-fail)";
+  const ink =
+    tone === "pass"
+      ? "var(--qs-pass-ink)"
+      : tone === "pending"
+        ? "var(--qs-pending)"
+        : tone === "warn"
+          ? "var(--qs-warn)"
+          : "var(--qs-fail-ink)";
+  const label = score === 0 ? "None" : score <= 3 ? "Low" : score <= 6 ? "Medium" : score <= 9 ? "High" : "Critical";
+  return (
+    <div className="severity" aria-label={`Severity ${score} of 10, ${label}`}>
+      <div className="severity-ticks" aria-hidden="true">
+        {Array.from({ length: 11 }, (_, i) => (
+          <span key={i} className="severity-tick" style={{ background: i <= score ? color : "var(--qs-n-200)" }} />
+        ))}
+      </div>
+      <p className="num severity-label" style={{ color: ink }}>
+        {score} / 10 <span className="dim">· {label}</span>
+      </p>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  ComparisonBar — n-bar comparison (severity contribution bars too)   */
 /* ------------------------------------------------------------------ */
 
 export interface ComparisonRow {
   name: string;
   value: number;
-  /** "primary" for the first series, "secondary" for the comparison, "pass" for a good outcome, "fail" for a bad one */
   tone?: "primary" | "secondary" | "pass" | "fail";
+  format?: (v: number) => string;
 }
 
 const ROW_TONE: Record<NonNullable<ComparisonRow["tone"]>, { bar: string; text: string }> = {
@@ -521,15 +634,12 @@ const ROW_TONE: Record<NonNullable<ComparisonRow["tone"]>, { bar: string; text: 
 export function ComparisonBar({
   label,
   rows,
-  format = (v: number) => v.toFixed(3),
   unit,
   marker,
 }: {
   label: string;
   rows: ComparisonRow[];
-  format?: (v: number) => string;
   unit?: string;
-  /** a reference line, e.g. the detection threshold */
   marker?: { value: number; label: string };
 }) {
   const max = Math.max(...rows.map((r) => r.value), marker?.value ?? 0, 1e-12);
@@ -542,12 +652,13 @@ export function ComparisonBar({
       <div className="space-y-2.5">
         {rows.map((row) => {
           const tone = ROW_TONE[row.tone ?? "primary"];
+          const fmt = row.format ?? ((v: number) => v.toFixed(3));
           return (
             <div key={row.name}>
               <div className="mb-1 flex items-baseline justify-between gap-2">
                 <span className="text-[13px] text-n-600">{row.name}</span>
                 <span className={`num text-[13px] font-semibold ${tone.text}`}>
-                  {format(row.value)}
+                  {fmt(row.value)}
                 </span>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-n-200">
@@ -562,7 +673,7 @@ export function ComparisonBar({
       </div>
       {marker && (
         <p className="num mt-2 text-[12px] text-n-500">
-          {marker.label}: {format(marker.value)}
+          {marker.label}: {marker.value}
         </p>
       )}
     </figure>
@@ -570,8 +681,7 @@ export function ComparisonBar({
 }
 
 /* ------------------------------------------------------------------ */
-/*  EmptyState — used wherever the backend has nothing to report.        */
-/*  "Data unavailable" beats a fabricated chart.                         */
+/*  EmptyState — friendly nothing-here card                              */
 /* ------------------------------------------------------------------ */
 
 export function EmptyState({
@@ -582,7 +692,7 @@ export function EmptyState({
   children?: ReactNode;
 }) {
   return (
-    <div className="card-muted px-4 py-6 text-center">
+    <div className="card-muted px-4 py-8 text-center">
       <p className="display text-[13px] font-medium tracking-[0.04em] text-n-600 uppercase">
         {title}
       </p>
@@ -596,124 +706,40 @@ export function EmptyState({
 }
 
 /* ------------------------------------------------------------------ */
-/*  VerifierPanel — one verifier's identity, outcome, verdict. Shows     */
-/*  whichever measurement the backend actually sent: a mismatch rate     */
-/*  where it has one, otherwise the block counts it does have.           */
+/*  Field — labelled input for the New Simulation form                  */
 /* ------------------------------------------------------------------ */
 
-export function VerifierPanel({
-  name,
-  index,
-  verdict,
-  timestamp,
-  active = false,
-  mismatchRate,
-  blocks,
+export function Field({
+  label,
+  hint,
+  error,
+  children,
 }: {
-  name: string;
-  index: number;
-  verdict: "accepted" | "rejected" | "pending";
-  timestamp?: string;
-  active?: boolean;
-  mismatchRate?: number;
-  blocks?: { failed: number; total: number };
+  label: string;
+  hint?: ReactNode;
+  error?: string;
+  children: ReactNode;
 }) {
+  const id = useId();
   return (
-    <div
-      className={`card-muted p-4 ${active ? "ring-1 ring-primary" : ""}`}
-      aria-label={`Verifier ${index}: ${name}`}
-    >
-      <div className="flex items-center gap-2">
-        <span className="grid size-7 shrink-0 place-items-center rounded-[var(--qs-r-sm)] bg-surface-2 text-n-600">
-          <Icon name="eye" size={15} />
-        </span>
-        <div className="min-w-0">
-          <p className="display truncate text-[13px] font-semibold text-on-surface">
-            {name}
-          </p>
-          <p className="micro text-n-500">Verifier {index}</p>
-        </div>
+    <div>
+      <label
+        htmlFor={id}
+        className="display text-[13px] font-medium tracking-[0.04em] text-on-surface uppercase"
+      >
+        {label}
+      </label>
+      <div className="mt-1.5" id={id}>
+        {children}
       </div>
-      <dl className="mt-4 space-y-2.5">
-        {mismatchRate !== undefined && (
-          <div className="flex items-baseline justify-between gap-2">
-            <dt className="display text-[12px] tracking-[0.04em] text-n-500 uppercase">
-              Mismatch
-            </dt>
-            <dd className="num text-[14px] font-semibold text-on-surface">
-              {mismatchRate.toFixed(3)}
-            </dd>
-          </div>
-        )}
-        {blocks && (
-          <div className="flex items-baseline justify-between gap-2">
-            <dt className="display text-[12px] tracking-[0.04em] text-n-500 uppercase">
-              Blocks failed
-            </dt>
-            <dd className="num text-[14px] font-semibold text-on-surface">
-              {blocks.failed} / {blocks.total}
-            </dd>
-          </div>
-        )}
-        <div className="flex items-baseline justify-between gap-2">
-          <dt className="display text-[12px] tracking-[0.04em] text-n-500 uppercase">
-            Verdict
-          </dt>
-          <dd>
-            <StatusBadge
-              tone={verdict === "accepted" ? "honest" : verdict === "rejected" ? "attack" : "pending"}
-            >
-              {verdict}
-            </StatusBadge>
-          </dd>
-        </div>
-        {timestamp && (
-          <div className="flex items-baseline justify-between gap-2">
-            <dt className="display text-[12px] tracking-[0.04em] text-n-500 uppercase">
-              Reported
-            </dt>
-            <dd className="num text-[12px] text-n-500">{timestamp}</dd>
-          </div>
-        )}
-      </dl>
+      {error ? (
+        <p className="mt-1.5 flex items-center gap-1.5 text-[13px] text-warn">
+          <Icon name="alert-triangle" size={14} />
+          {error}
+        </p>
+      ) : hint ? (
+        <p className="mt-1.5 text-[13px] text-n-500">{hint}</p>
+      ) : null}
     </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  EventLogRow — timestamp + attack type + verdict + flagged-by        */
-/* ------------------------------------------------------------------ */
-
-export function EventLogRow({
-  timestamp,
-  attackType,
-  runId,
-  verdict,
-  flaggedBy,
-  detected,
-}: {
-  timestamp: string;
-  attackType: string;
-  runId: string;
-  verdict: "accepted" | "rejected";
-  flaggedBy: DetectionMechanism;
-  detected: boolean;
-}) {
-  return (
-    <tr
-      className={`border-b border-outline text-[13px] last:border-0 ${
-        detected ? "bg-fail-tint" : ""
-      }`}
-    >
-      <td className="num px-3 py-2.5 whitespace-nowrap text-n-500">{timestamp}</td>
-      <td className="px-3 py-2.5 whitespace-nowrap text-on-surface">{attackType}</td>
-      <td className="num px-3 py-2.5 whitespace-nowrap text-n-500">{runId}</td>
-      <td className="px-3 py-2.5 whitespace-nowrap">
-        <StatusBadge tone={detected ? "attack" : "honest"}>{verdict}</StatusBadge>
-      </td>
-      <td className="px-3 py-2.5 whitespace-nowrap text-n-600">
-        {mechanismLabel(flaggedBy)}
-      </td>
-    </tr>
   );
 }
