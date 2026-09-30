@@ -1,0 +1,18 @@
+# Render blueprint — dashboard "New + > Blueprint" picks this up from the repo.
+services:
+  - type: web
+    name: qsentinel-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      # Set in the Render dashboard (secret):
+      #   postgresql+psycopg://postgres:<password>@<supabase-host>:5432/qsentinel?sslmode=require
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://qsentinel.vercel.app
+      - key: LOG_LEVEL
+        value: INFO
