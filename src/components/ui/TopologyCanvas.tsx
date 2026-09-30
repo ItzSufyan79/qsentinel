@@ -1,11 +1,31 @@
 /**
  * Network topology canvas — report section 6.2. Pure SVG driven by the live
- * stage and the attack configuration. No numbers here; the numbers live in the
- * stage panels. Eve is always visible while an attack is configured, and the
- * tapped edge is marked in red so the reader sees exactly where she sits.
+ * stage AND the current event frame, so each stage shows exactly what moves
+ * on which channel:
+ *   · fidelity   — probe pairs await Alice's entanglement test
+ *   · keys       — Alice prepares one 0/1 bag-pair per encoded position
+ *   · distribute — quantum states téléport to the current set's verifier,
+ *                  correction bits follow the classical channel
+ *   · sign       — only classical: the signature travels, states already sit
+ *                  with the verifiers (so the quantum links go quiet)
+ *   · verify     — the active verifier measures bag-by-bag
+ * Eve is always visible while an attack is configured, and the tapped edge is
+ * marked in red. No numbers here; the numbers live in the stage panels.
  */
 
-import type { AttackTypeId, StageId, TamperingSubtype, TargetLink } from "../../api/types";
+import type {
+  AttackTypeId,
+  DistributeEvent,
+  InjectEvent,
+  LedgerEvent,
+  RunEvent,
+  SignEvent,
+  StageId,
+  TamperingSubtype,
+  TargetLink,
+  VerifyBagEvent,
+  VerifierName,
+} from "../../api/types";
 import { attackLabel, tamperingLabel } from "../../api/types";
 
 interface Props {
@@ -13,6 +33,8 @@ interface Props {
   attack: AttackTypeId;
   subtype: TamperingSubtype | null;
   targetLink: TargetLink;
+  /** the frame currently under the playhead; drives the stage choreography */
+  event?: RunEvent | undefined;
 }
 
 const ALICE = { x: 120, y: 155 } as const;
@@ -43,7 +65,74 @@ const EDGES: EdgeDef[] = [
 
 const LABEL_AT: Record<string, string> = { qb: "68%", cb: "30%", qc: "68%", cc: "30%" };
 
-export function TopologyCanvas({ stage, attack, subtype, targetLink }: Props) {
+/** a single travelling packet on one channel */
+function Packet({
+  edge,
+  color,
+  dur,
+  delay = "0s",
+  r = 3.5,
+}: {
+  edge: EdgeDef;
+  color: string;
+  dur: string;
+  delay?: string;
+  r?: number;
+}) {
+  return (
+    <circle r={r} fill={color}>
+      <animateMotion dur={dur} begin={delay} repeatCount="indefinite">
+        <mpath href={`#qs-edge-${edge.id}`} />
+      </animateMotion>
+    </circle>
+  );
+}
+
+/** small mono callout next to a node (learned from the frames, no invented numbers) */
+function Callout({
+  x,
+  y,
+  text,
+  tone = "var(--qs-n-500)",
+  reverse = false,
+}: {
+  x: number;
+  y: number;
+  text: string;
+  tone?: string;
+  reverse?: boolean;
+}) {
+  return (
+    <text
+      x={x}
+      y={y}
+      textAnchor={reverse ? "end" : "start"}
+      className="topo-tap"
+      style={{ fill: tone }}
+    >
+      {text}
+    </text>
+  );
+}
+
+/** animated ring — measurement / admission / set delivery */
+function PulseRing({ x, y, color, label }: { x: number; y: number; color: string; label?: string }) {
+  return (
+    <g>
+      <circle r="40" fill="none" stroke={color} strokeWidth="1.5">
+        <animate attributeName="r" values="40;52;40" dur="1.4s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.9;0.35;0.9" dur="1.4s" repeatCount="indefinite" />
+      </circle>
+      {label && (
+        <text x={x} y={y} textAnchor="middle" className="topo-tap" style={{ fill: color }}>
+          {label}
+        </text>
+      )}
+    </g>
+  );
+}
+
+export function TopologyCanvas({ stage, attack, subtype, targetLink, event }: Props) {
   const hasAttack = attack !== "no-attack";
 
   /** Which channel type Eve tapped this attack type. */
@@ -51,7 +140,30 @@ export function TopologyCanvas({ stage, attack, subtype, targetLink }: Props) {
   const classicalTap =
     attack === "forgery" || subtype === "message-substitution" || subtype === "correction-bit";
 
-  const animateQuantum = stage === "distribute" || stage === "verify" || stage === "sign";
+  /** What physically moves, per stage — learned from the event frames. */
+  const distribute = stage === "distribute";
+  const signing = stage === "sign";
+  const verifying = stage === "verify";
+  const fidelity = stage === "fidelity";
+  const keying = stage === "keys";
+  const analysis = stage === "analysis";
+
+  /** recipient of the current distribute frame, when known */
+  const distTo = (event?.kind === "distribute"
+    ? (event as DistributeEvent).set === "a"
+      ? "bob"
+      : "charlie"
+    : null) as "bob" | "charlie" | null;
+
+  /* quantum states only ever move during distribute (teleportation) — and
+     only on the channel toward the current set's verifier. */
+  const quantumPacket = (e: EdgeDef) =>
+    e.kind === "quantum" && distribute && (distTo === null || e.to === distTo);
+
+  /* correction bits ride the classical channel during distribute (same
+     recipient); the signature follows it to both verifiers during sign. */
+  const classicalPacket = (e: EdgeDef) =>
+    e.kind === "classical" && (signing || (distribute && (distTo === null || e.to === distTo)));
 
   const active = (on: StageId | StageId[]) =>
     (Array.isArray(on) ? on : [on]).includes(stage as StageId);
@@ -73,13 +185,31 @@ export function TopologyCanvas({ stage, attack, subtype, targetLink }: Props) {
     };
   };
 
+  /* ---- current-frame facts the diagram turns into movement ---- */
+  const measuring: VerifierName | null =
+    verifying && event?.kind === "verify-bag"
+      ? (event as VerifyBagEvent).verifier
+      : null;
+
+  const signingMessage = signing && event?.kind === "sign" ? (event as SignEvent).message : null;
+
+  const injected = event?.kind === "inject" ? (event as InjectEvent) : null;
+
+  const ledger = event?.kind === "ledger" ? (event as LedgerEvent) : null;
+
+  const node = (who: "bob" | "charlie") => (who === "bob" ? BOB : CHARLIE);
+
   return (
     <figure className="topology" aria-label="Device topology">
       <svg viewBox="0 0 620 360" className="w-full" role="img" aria-hidden="true">
         {/* channels: solid = quantum state, dashed = classical */}
         {EDGES.map((e) => {
           const red = isTapped(e);
-          const on = active(e.kind === "quantum" ? ["distribute", "sign", "verify"] : ["sign", "verify"]);
+          const on = active(
+            e.kind === "quantum"
+              ? ["distribute", "verify", "fidelity"]
+              : ["distribute", "sign", "verify"],
+          );
           const href = `#qs-edge-${e.id}`;
           return (
             <g key={e.id}>
@@ -91,12 +221,15 @@ export function TopologyCanvas({ stage, attack, subtype, targetLink }: Props) {
                 strokeWidth={red ? 2.5 : on ? 2 : 1.25}
                 strokeDasharray={red ? "6 4" : e.kind === "quantum" ? undefined : "5 4"}
               />
-              {animateQuantum && e.kind === "quantum" && (
-                <circle r="3.5" fill="var(--qs-primary)">
-                  <animateMotion dur="1.1s" repeatCount="indefinite">
-                    <mpath href={href} />
-                  </animateMotion>
-                </circle>
+              {/* the physical payload this stage actually moves */}
+              {(quantumPacket(e) || classicalPacket(e)) && (
+                <Packet
+                  edge={e}
+                  color={e.kind === "quantum" ? "var(--qs-primary)" : "var(--qs-n-600)"}
+                  dur={e.kind === "quantum" ? "1.4s" : "1.8s"}
+                  r={e.kind === "quantum" ? 3.5 : 2.6}
+                  delay={e.kind === "quantum" && e.to === "bob" ? "-0.7s" : "0s"}
+                />
               )}
               <text className="topo-label" dy="-5">
                 <textPath href={href} startOffset={LABEL_AT[e.id]}>
@@ -120,12 +253,70 @@ export function TopologyCanvas({ stage, attack, subtype, targetLink }: Props) {
           </g>
         ))}
 
+        {/* ---- stage callouts, learned from the live frames ---- */}
+        {fidelity && (
+          <Callout x={ALICE.x + 42} y={ALICE.y + 12} text="probe pairs ready" />
+        )}
+
+        {keying && <Callout x={ALICE.x + 42} y={ALICE.y + 12} text="prepares 0/1 bag-pairs" />}
+
+        {distribute &&
+          (distTo ? (
+            <PulseRing
+              x={node(distTo).x}
+              y={node(distTo).y + 54}
+              color="var(--qs-secondary)"
+              label={`receives set ${((event as DistributeEvent).set).toUpperCase()}`}
+            />
+          ) : (
+            <Callout x={ALICE.x + 42} y={ALICE.y + 12} text="teleports states" />
+          ))}
+
+        {signing && (
+          <Callout
+            x={BOB.x - 40}
+            y={BOB.y + 8}
+            reverse
+            tone="var(--qs-secondary)"
+            text={signingMessage ? `signs "${signingMessage}"` : "signs message"}
+          />
+        )}
+
+        {verifying &&
+          (measuring ? (
+            <PulseRing
+              x={node(measuring).x}
+              y={node(measuring).y + 54}
+              color="var(--qs-secondary)"
+              label={`measuring bag ${String((event as VerifyBagEvent).bagIndex).padStart(2, "0")}`}
+            />
+          ) : (
+            <Callout x={ALICE.x + 42} y={ALICE.y + 12} text="verifiers measure" />
+          ))}
+
+        {ledger && (
+          <Callout
+            x={ALICE.x + 42}
+            y={ALICE.y + 34}
+            tone={ledger.found ? "var(--qs-primary)" : "var(--qs-fail)"}
+            text={`ledger ${ledger.found ? "ok" : "reject"}`}
+          />
+        )}
+
+        {verifying && event?.kind === "verify-done" && (
+          <Callout x={ALICE.x + 42} y={ALICE.y + 12} text="full measurement" />
+        )}
+
+        {analysis && <Callout x={ALICE.x + 42} y={ALICE.y + 12} text="examining evidence" />}
+
         {/* Alice */}
         <g transform={`translate(${ALICE.x} ${ALICE.y})`}>
           <circle r="34" fill="var(--qs-n-100)" stroke="var(--qs-n-400)" strokeWidth="1.5" />
           <text y="4" textAnchor="middle" className="topo-name">Alice</text>
           <text y="20" textAnchor="middle" className="topo-role">sender</text>
-          {active("fidelity") && <circle r="40" fill="none" stroke="var(--qs-primary)" strokeWidth="1.5" strokeDasharray="4 3" />}
+          {active(["fidelity", "distribute", "sign"]) && (
+            <circle r="40" fill="none" stroke="var(--qs-primary)" strokeWidth="1.5" strokeDasharray="4 3" />
+          )}
         </g>
 
         {/* Bob */}
@@ -170,6 +361,43 @@ export function TopologyCanvas({ stage, attack, subtype, targetLink }: Props) {
             </text>
           </g>
         ) : null}
+
+        {/* what Eve actually put on the line — from the inject frame */}
+        {injected && (
+          <g>
+            {quantumTap && (
+              <text x={EVE.x + EVE.r + 8} y={30} className="topo-tap" style={{ fill: "var(--qs-fail)" }}>
+                {injected.slotsAttacked != null
+                  ? "overwrites slots"
+                  : injected.subtype === "fixed-basis"
+                    ? "fixed-basis"
+                    : "random-basis"}
+              </text>
+            )}
+            {classicalTap && (
+              <text x={EVE.x + EVE.r + 8} y={30} className="topo-tap" style={{ fill: "var(--qs-fail)" }}>
+                {injected.tamperedMessage != null
+                  ? `replaces with "${injected.tamperedMessage}"`
+                  : injected.correctionFlipped != null
+                    ? "flips correction bit"
+                    : "forges signature"}
+              </text>
+            )}
+          </g>
+        )}
+
+        {/* replay: the ledger is queried with a foreign id — only replay presents
+            a session id that is not this run's own */}
+        {ledger && attack === "replay" && (
+          <text
+            x={EVE.x + EVE.r + 8}
+            y={30}
+            className="topo-tap"
+            style={{ fill: "var(--qs-fail)" }}
+          >
+            requests {ledger.queriedId.slice(0, 10)}…
+          </text>
+        )}
       </svg>
 
       <figcaption className="topology-caption">

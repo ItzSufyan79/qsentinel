@@ -283,6 +283,7 @@ export function LiveRunPage() {
               attack={attack}
               subtype={subtype}
               targetLink={targetLink}
+              event={cur}
             />
           </div>
 
