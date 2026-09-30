@@ -1,0 +1,20 @@
+# Render blueprint — dashboard "New + > Blueprint" picks this up from the repo.
+services:
+  - type: web
+    name: qsentinel-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      # Set in the Render dashboard (secret). MUST use the IPv4 pooler host —
+      # the direct db.<ref>.supabase.co host is IPv6-only and Render free tier
+      # has no IPv6 route. Region ap-south-1; port 5432 = session mode.
+      #   postgresql+psycopg://postgres.<ref>:<password>@aws-0-ap-south-1.pooler.supabase.com:5432/qsentinel?sslmode=require
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://qsentinel.vercel.app
+      - key: LOG_LEVEL
+        value: INFO
