@@ -11,6 +11,19 @@ activity through statistical evaluation and threshold-based decision rules.
 Detection never uses AI or machine learning: it measures, compares the
 distribution against the expected one, applies a threshold, and decides.
 
+## Layout
+
+One repository, two deployables:
+
+| Path | What | Deployed to |
+| --- | --- | --- |
+| `/` | React + TypeScript frontend | Vercel — `qsentinel.vercel.app` |
+| `/backend` | FastAPI engine + contract routes | Render — `qsentinel-api.onrender.com` |
+
+`render.yaml` at the repo root drives Render via a Blueprint (`rootDir: backend`).
+The backend has its own state notes under `backend/BACKEND_STATE.md`; connect it
+with `DATABASE_URL` and `CORS_ORIGINS` as documented in `backend/.env.example`.
+
 ## Pages
 
 Six routes, each a real URL that can be opened, reloaded, or linked to directly.

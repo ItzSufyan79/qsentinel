@@ -1,8 +1,10 @@
 # Render blueprint — dashboard "New + > Blueprint" picks this up from the repo.
+# The API lives in backend/; the service runs its build + start inside that rootDir.
 services:
   - type: web
     name: qsentinel-api
     runtime: python
+    rootDir: backend
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
