@@ -22,7 +22,9 @@ import { ApiError, attackLabel, tamperingLabel } from "../api/types";
 import { useApi } from "../lib/useApi";
 import { useRunId } from "../lib/useRunId";
 import { getRun, saveRun } from "../lib/runStore";
-import { DIAGNOSIS, diagnosisKey, HONEST } from "../lib/copy";
+import { HONEST } from "../lib/copy";
+import { useSystem } from "../lib/useSystem";
+import type { SystemResponse } from "../api/types";
 import { probability } from "../lib/formatting";
 import {
   Banner,
@@ -46,18 +48,18 @@ import {
 import { LogTable } from "../components/ui/LogTable";
 import type { IconName } from "../lib/iconNames";
 
-const CAP = {
+const capOf = (sys: SystemResponse["params"]) => ({
   fidelity: {
     what: "How genuine the quantum link between Alice and each verifier is, scored 0 to 1.",
-    how: "Above the 0.5 line = entanglement demonstrated. Below it, the session is refused. 0.25 is what a link with no entanglement looks like.",
+    how: `Above the ${sys.fidelityGate} line = entanglement demonstrated. Below it, the session is refused. 0.25 is what a link with no entanglement looks like.`,
   },
   ledger: {
     what: "The session ledger check that runs before any quantum measurement.",
     how: "ACTIVE proceeds. USED = replay. Not found = unauthorized.",
   },
   bagdist: {
-    what: "How many wrong slots to expect per 128-slot bag. Honest signers get a handful; cheaters get about a third.",
-    how: "Curves that barely overlap = an easy decision. The vertical line at 12 is the pass line. Each dot is a bag from this run.",
+    what: `How many wrong slots to expect per ${sys.slotsPerBag}-slot bag. Honest signers get a handful; cheaters get about a third.`,
+    how: `Curves that barely overlap = an easy decision. The vertical line at ${sys.passLine} is the pass line. Each dot is a bag from this run.`,
   },
   fingerprint: {
     what: "For each measurement basis (Z, X, Y), the fraction of wrong answers. Different attacks leave different patterns, like fingerprints.",
@@ -65,7 +67,7 @@ const CAP = {
   },
   heatmap: {
     what: "Each square is one bag of the signature, colored by how many of its slots were wrong.",
-    how: "Teal = clean. Red with an x = failed (12 or more wrong). Hover or focus for details.",
+    how: `Teal = clean. Red with an x = failed (${sys.passLine} or more wrong). Hover or focus for details.`,
   },
   bvc: {
     what: "Two independent verifiers checking the same signature with their own quantum material.",
@@ -73,7 +75,7 @@ const CAP = {
   },
   detection: {
     what: "How likely the attack is to be caught at each strength.",
-    how: "Dashed = a single bag. Solid = the whole 63-bag signature (all bags must pass), which catches much more.",
+    how: `Dashed = a single bag. Solid = the whole ${sys.bags}-bag signature (all bags must pass), which catches much more.`,
   },
   severity: {
     what: "A 0–10 score for how serious this incident is.",
@@ -87,20 +89,23 @@ const CAP = {
     what: "Everything Eve did in this run, so the result is reproducible.",
     how: "Read-only; shown with the seed that re-creates the run.",
   },
-} as const;
+}) as const;
 
 /** a measured verifier prefers the one the fingerprint came from */
 function measuredVerifier(env: ResultResponse["verdictBanner"]): "bob" | "charlie" {
   return env.verifiers.bob.rates ? "bob" : "charlie";
 }
 
-function passLineOf(env: ResultResponse["verdictBanner"]): number {
-  return env.bagDistribution?.passLine ?? 12;
+function passLineOf(env: ResultResponse["verdictBanner"], fallback: number): number {
+  // the run's own number when measured; otherwise the backend-served parameter
+  return env.bagDistribution?.passLine ?? fallback;
 }
 
 export function ResultsPage() {
   const navigate = useNavigate();
   const runId = useRunId();
+  const { params: sys } = useSystem();
+  const CAP = capOf(sys);
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") ?? "statistics";
 
@@ -172,10 +177,10 @@ export function ResultsPage() {
   const res = data;
   const env = res.verdictBanner;
   const config = env.attackConfig;
-  const diag = DIAGNOSIS[diagnosisKey(config.attack, config.subtype)] ?? DIAGNOSIS["no-attack"];
+  const diag = env.diagnosis; // backend-owned (report 7.9): keyed by what was DETECTED, not configured
   const v = env.verifiers;
   const used = measuredVerifier(env);
-  const passLine = passLineOf(env);
+  const passLine = passLineOf(env, sys.passLine);
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-8 md:px-8 lg:px-10">
@@ -190,6 +195,15 @@ export function ResultsPage() {
               </h1>
             </div>
             <p className="mt-2 text-[15px] font-semibold text-ink">{res.classification}</p>
+            {config.attack !== "no-attack" && res.verdict === "ACCEPTED" && (
+              <p
+                className="mt-2 inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] font-semibold"
+                style={{ background: "var(--qs-warn-tint)", color: "var(--qs-warn)" }}
+                data-testid="missed-attack-badge"
+              >
+                <Icon name="alert-triangle" size={14} /> Attack present, not detected
+              </p>
+            )}
             <p className="mt-1 max-w-xl text-[14px] leading-relaxed text-n-600">{res.story}</p>
           </div>
 
@@ -207,7 +221,7 @@ export function ResultsPage() {
             <SeverityGauge score={env.severity.score} />
             <MetricCard
               label="Confidence"
-              value={Math.round(res.confidence * 100)}
+              value={res.confidence * 100}
               unit="%"
               tone={res.verdict === "ACCEPTED" ? "pass" : "brand"}
             />
@@ -487,6 +501,8 @@ function StatisticsGrid({
   setHeatView: (x: "bob" | "charlie") => void;
   onRetryBin: () => void;
 }) {
+  const { params: sys } = useSystem();
+  const CAP = capOf(sys);
   const env = res.verdictBanner;
   const active = env.fidelityTest;
   const anyRun = v.bob.verdict !== "NOT RUN" || v.charlie.verdict !== "NOT RUN";

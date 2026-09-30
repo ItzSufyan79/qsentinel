@@ -16,7 +16,8 @@ import {
   type TamperingSubtype,
   type TargetLink,
 } from "../api/types";
-import { SYSTEM_PARAMS, api } from "../api";
+import { api } from "../api";
+import { useSystem } from "../lib/useSystem";
 import { SectionHead, Banner, Field, LockChip, Term, Icon, StatusBadge } from "../components/ui/atoms";
 import { saveRun } from "../lib/runStore";
 import type { IconName } from "../lib/iconNames";
@@ -43,7 +44,7 @@ const REPLAY_TYPES: { id: ReplayType; label: string; note: string }[] = [
 ];
 
 /** which attacks take a target-link control (report 5.3) */
-const NEEDS_TARGET: AttackTypeId[] = ["forgery", "tampering"];
+const NEEDS_TARGET: AttackTypeId[] = ["tampering"]; // forgery always hits both verifiers (report 6.2)
 const NEEDS_TARGET_SUBTYPES: TamperingSubtype[] = [
   "fixed-basis",
   "random-basis",
@@ -60,6 +61,7 @@ export function NewSimulationPage() {
   const [message, setMessage] = useState("TRANSFER 1000");
   const [tamperedMessage, setTamperedMessage] = useState("");
   const [targetLink, setTargetLink] = useState<TargetLink | null>(null);
+  const { params } = useSystem();
   const [fixedBasis, setFixedBasis] = useState<(typeof BASES)[number]>("Z");
   const [intensity, setIntensity] = useState(25);
   const [replayType, setReplayType] = useState<ReplayType | null>(null);
@@ -108,13 +110,13 @@ export function NewSimulationPage() {
     if (attack === null) return null;
     const what =
       attack === "no-attack"
-        ? `Alice will sign "${message}". No attacker configured; Bob and Charlie will both verify. Expected result: all checks pass.`
+        ? `Alice will sign "${message}". No attacker configured; Bob and Charlie will both verify.`
         : attack === "impersonation"
-          ? 'Eve will try to start a session as Alice. Expected result: the Fidelity Test refuses the session before any key or signature exists.'
+          ? "Eve will try to start a session as Alice. The Fidelity Test screens every session before any key or signature exists."
           : attack === "replay"
-            ? `Eve will resend ${replayType === "unknown" ? "a session ID the ledger has never issued" : "an old, already-verified session"}. Expected result: rejected at the ledger before any quantum measurement.`
+            ? `Eve will resend ${replayType === "unknown" ? "a session ID the ledger has never issued" : "an old, already-verified session"}. The session ledger is consulted before any quantum measurement.`
             : attack === "forgery"
-              ? `Eve will build a fake signature for "${message}" without Alice's private material, against ${targetLink === "both" ? "both Bob and Charlie" : `${targetLink} only`}. Expected result: ${RejectText(targetLink)}`
+              ? `Eve will build a fake signature for "${message}" without Alice's private material and submit it to both Bob and Charlie.`
               : attack === "tampering" && subtype
                 ? tamperPreview(subtype, message, tamperedMessage, targetLink, intensity)
                 : null;
@@ -326,7 +328,7 @@ export function NewSimulationPage() {
                       className="qs-slider"
                     />
                     <p className="micro mt-2 text-n-500">
-                      ≈ {Math.round((intensity * SYSTEM_PARAMS.slotsPerBag) / 100)} of 128 slots per bag will be attacked.
+                      Eve will intercept {intensity}% of the {params.slotsPerBag} slots in every bag; the exact count arrives with the run.
                     </p>
                   </Field>
                 </div>
@@ -411,10 +413,10 @@ export function NewSimulationPage() {
 
               {/* locked system parameters */}
               <div className="mt-4 flex flex-wrap gap-2">
-                <LockChip label="Slots per bag" value={SYSTEM_PARAMS.slotsPerBag} />
-                <LockChip label="Bags" value={SYSTEM_PARAMS.bags} />
-                <LockChip label="Pass line" value={`< ${SYSTEM_PARAMS.passLine} wrong`} />
-                <LockChip label="Fidelity gate" value={`F > ${SYSTEM_PARAMS.fidelityGate}`} />
+                <LockChip label="Slots per bag" value={params.slotsPerBag} />
+                <LockChip label="Bags" value={params.bags} />
+                <LockChip label="Pass line" value={`< ${params.passLine} wrong`} />
+                <LockChip label="Fidelity gate" value={`F > ${params.fidelityGate}`} />
                 <LockChip label="Verifiers" value="2 (Bob, Charlie)" />
                 <LockChip label="Honest error rate" value="2%" />
               </div>
@@ -504,20 +506,15 @@ function tamperPreview(
   const to = targetLink === "both" ? "both Bob and Charlie" : `${targetLink ?? "the target"} only`;
   switch (subtype) {
     case "fixed-basis":
-      return `Alice will sign "${message}". Eve will intercept the quantum link to ${to}, measuring every qubit with one fixed basis and re-sending new qubits. Expected result: ${RejectText(targetLink)}`;
+      return `Alice will sign "${message}". Eve will intercept the quantum link to ${to}, measuring every qubit with one fixed basis and re-sending new qubits.`;
     case "random-basis":
-      return `Alice will sign "${message}". Eve will attack the link to ${to}, guessing a basis for every qubit she intercepts. Bob and Charlie will both verify. Expected result: ${RejectText(targetLink)}`;
+      return `Alice will sign "${message}". Eve will attack the link to ${to}, guessing a basis for every qubit she intercepts. Bob and Charlie will both verify.`;
     case "partial":
-      return `Alice will sign "${message}". Eve will attack about ${Math.round((intensity * 128) / 100)} of 128 slots per bag on the link to ${to}. Expected result: ${RejectText(targetLink)}`;
+      return `Alice will sign "${message}". Eve will intercept ${intensity}% of the slots in every bag on the link to ${to}.`;
     case "message-substitution":
-      return `Alice will sign "${message}", then Eve will substitute "${tamperedMessage}" on the classical path to ${to}. Expected result: the mismatch at changed positions gives it away.`;
+      return `Alice will sign "${message}", then Eve will substitute "${tamperedMessage}" on the classical path to ${to}.`;
     case "correction-bit":
-      return `Alice will sign "${message}". Eve will edit the teleportation correction bits on the classical link to ${to}. Expected result: ${RejectText(targetLink)}`;
+      return `Alice will sign "${message}". Eve will edit the teleportation correction bits on the classical link to ${to}.`;
   }
 }
 
-function RejectText(targetLink: TargetLink | null): string {
-  return targetLink === "bob" || targetLink === "charlie"
-    ? `${targetLink === "bob" ? "Bob" : "Charlie"} rejects; the other accepts — verifiers disagree.`
-    : "both verifiers reject.";
-}

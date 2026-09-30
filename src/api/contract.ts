@@ -24,6 +24,7 @@ import type {
   ResultResponse,
   RunConfig,
   RunEvent,
+  SystemResponse,
 } from "./types";
 import { ApiError } from "./types";
 
@@ -81,6 +82,12 @@ export interface QdsApi {
   /** POST /api/runs/{id}/rerun — same settings, new session. */
   rerun(runId: string, ctx?: RunContext): Promise<RerunResponse>;
 
+  /**
+   * GET /api/system — fixed parameters, fingerprint library, versions.
+   * The backend owns every displayed constant (report 2.2, 7.2).
+   */
+  getSystem(ctx?: RunContext): Promise<SystemResponse>;
+
   /** GET /api/history — past runs + per-attack detection summary. */
   getHistory(ctx?: RunContext): Promise<HistoryResponse>;
 }
@@ -97,6 +104,7 @@ export const ROUTES = {
   rerun: (id: string) => `/api/runs/${id}/rerun`,
   binomial: "/api/analysis/binomial",
   history: "/api/history",
+  system: "/api/system",
 } as const;
 
 /* ------------------------------------------------------------------ *

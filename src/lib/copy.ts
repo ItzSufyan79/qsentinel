@@ -91,69 +91,6 @@ export const storyKey = (attack: string, subtype: string | null): string =>
       : attack;
 
 /* ------------------------------------------------------------------ *
- *  Root cause + mitigation library — report 10.2
- * ------------------------------------------------------------------ */
-
-export interface Diagnosis {
-  cause: string;
-  mitigation: string[];
-}
-
-export const DIAGNOSIS: Record<string, Diagnosis> = {
-  "no-attack": {
-    cause: "No anomaly detected",
-    mitigation: ["None required"],
-  },
-  forgery: {
-    cause: "Signature was not produced from Alice's private quantum states",
-    mitigation: ["Reject and log", "Investigate where the signature originated"],
-  },
-  impersonation: {
-    cause: "Expected entangled resource not demonstrated at session admission",
-    mitigation: [
-      "Refuse the session",
-      "Verify the requester through an independent channel",
-      "Check link/hardware if unexpected",
-    ],
-  },
-  "replay-used": {
-    cause: "A previously verified session was resubmitted",
-    mitigation: ["Keep sessions single-use", "Alert on repeated USED-session submissions"],
-  },
-  "replay-unknown": {
-    cause: "Session ID never issued by the system",
-    mitigation: ["Reject", "Rate-limit and log the source", "Review how the ID was obtained"],
-  },
-  "tampering-fixed-basis": {
-    cause: "Interception at a particular link segment",
-    mitigation: ["Inspect the affected physical link"],
-  },
-  "tampering-random-basis": {
-    cause: "Quantum channel interception",
-    mitigation: ["Treat the channel as compromised", "Rotate to a fresh key batch"],
-  },
-  "tampering-partial": {
-    cause: "Intermittent interference on selected slots",
-    mitigation: [
-      "Rotate keys",
-      "Increase monitoring",
-      "Review repeated near-miss sessions",
-    ],
-  },
-  "tampering-message-substitution": {
-    cause: "Message altered after signing",
-    mitigation: ["Reject", "Verify message integrity along the delivery path"],
-  },
-  "tampering-correction-bit": {
-    cause: "Teleportation correction information modified on the classical channel",
-    mitigation: ["Investigate and authenticate the classical communication layer"],
-  },
-};
-
-export const diagnosisKey = (attack: string, subtype: string | null): string =>
-  attack === "replay" ? `replay-${subtype ?? "used"}` : attack === "tampering" ? `tampering-${subtype ?? "fixed-basis"}` : attack;
-
-/* ------------------------------------------------------------------ *
  *  Fingerprint library — report 10.3 (drives the ghost markers)
  * ------------------------------------------------------------------ */
 
@@ -165,13 +102,6 @@ export interface FingerprintPattern {
   meaning: string;
 }
 
-export const FINGERPRINT_LIBRARY: FingerprintPattern[] = [
-  { id: "honest", label: "Honest / normal noise", profile: [0.02, 0.02, 0.02], meaning: "normal noise" },
-  { id: "guess", label: "Blind guessing (forgery)", profile: [1 / 2, 1 / 2, 1 / 2], meaning: "blind guessing (forgery-type, no information)" },
-  { id: "random", label: "Random-basis intercept-resend", profile: [1 / 3, 1 / 3, 1 / 3], meaning: "random-basis intercept-resend" },
-  { id: "fixed", label: "Fixed-basis intercept-resend", profile: [1 / 2, 1 / 2, 0], meaning: "fixed-basis intercept-resend" },
-  { id: "correction", label: "Correction-bit tampering", profile: [1, 1, 0], meaning: "correction-bit tampering (two bases high, one near 0)" },
-];
 
 /* ------------------------------------------------------------------ *
  *  Honest wording fragments — report 10.4

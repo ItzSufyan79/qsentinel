@@ -15,9 +15,21 @@ import type {
   RerunResponse,
   ResultResponse,
   RunEvent,
+  SystemResponse,
 } from "./types";
 import { ApiError } from "./types";
 import { ROUTES, type QdsApi, type RunContext } from "./contract";
+
+const API_ERROR_CODES = new Set([
+  "NETWORK",
+  "TIMEOUT",
+  "ABORTED",
+  "RUN_NOT_FOUND",
+  "INVALID_PARAMS",
+  "INVALID_STATE",
+  "BACKEND_ERROR",
+]);
+const isApiErrorCode = (c: string): c is ApiErrorCode => API_ERROR_CODES.has(c);
 import { env } from "./env";
 
 /** Read per request so the failure-path test can point at different hosts. */
@@ -61,6 +73,26 @@ async function request<T>(
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
+      // The backend answers {code, message, detail?} (report 10.3). Anything
+      // else (proxy pages, plain text) falls back to the status mapping.
+      try {
+        const parsed = JSON.parse(body) as {
+          code?: string;
+          message?: string;
+          detail?: string;
+        };
+        if (parsed && typeof parsed.code === "string" && typeof parsed.message === "string") {
+          throw new ApiError(
+            isApiErrorCode(parsed.code) ? parsed.code : statusToCode(res.status),
+            parsed.message,
+            res.status,
+            parsed.detail,
+          );
+        }
+      } catch (e) {
+        if (e instanceof ApiError) throw e;
+        // not JSON — fall through
+      }
       throw new ApiError(
         statusToCode(res.status),
         body || `Request failed with ${res.status}`,
@@ -173,4 +205,6 @@ export const httpApi: QdsApi = {
   rerun: (runId, ctx) => post<RerunResponse>(ROUTES.rerun(runId), {}, ctx),
 
   getHistory: (ctx) => get<HistoryResponse>(ROUTES.history, ctx),
+
+  getSystem: (ctx) => get<SystemResponse>(ROUTES.system, ctx),
 };

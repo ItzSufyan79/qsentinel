@@ -35,7 +35,126 @@ import type {
 } from "./types";
 import { type QdsApi } from "./contract";
 import { SYSTEM_PARAMS } from "./contract";
-import { DIAGNOSIS, FINGERPRINT_LIBRARY, diagnosisKey } from "../lib/copy";
+import type { Diagnosis, SystemResponse } from "./types";
+
+/** The catalog attack key for a config — kept in-mock (report 11.2). */
+const diagnosisKey = (attack: string, subtype: string | null): string =>
+  attack === "replay"
+    ? `replay-${subtype ?? "used"}`
+    : attack === "tampering"
+      ? `tampering-${subtype ?? "fixed-basis"}`
+      : attack;
+
+/** Mock's own fingerprint library copy — the backend serves the real one. */
+const MOCK_FINGERPRINT_LIBRARY = [
+  { id: "honest", label: "Honest / normal noise", profile: [0.02, 0.02, 0.02] as [number, number, number], meaning: "normal noise" },
+  { id: "guess", label: "Blind guessing (forgery)", profile: [1 / 2, 1 / 2, 1 / 2] as [number, number, number], meaning: "blind guessing (forgery-type, no information)" },
+  { id: "random", label: "Random-basis intercept-resend", profile: [1 / 3, 1 / 3, 1 / 3] as [number, number, number], meaning: "random-basis intercept-resend" },
+  { id: "fixed", label: "Fixed-basis intercept-resend", profile: [1 / 2, 1 / 2, 0] as [number, number, number], meaning: "fixed-basis intercept-resend" },
+  { id: "correction", label: "Correction-bit tampering", profile: [1, 1, 0] as [number, number, number], meaning: "correction-bit tampering (two bases high, one near 0)" },
+] as const;
+
+/* ------------------------------------------------------------------ *
+ *  Mock's own diagnosis copy (report 11.2) — wording mirrors the
+ *  backend attack catalog verbatim, keyed by the catalog attack key.
+ * ------------------------------------------------------------------ */
+const MOCK_DIAGNOSIS: Record<string, Diagnosis> = {
+  "no-attack": {
+    key: "no-attack",
+    cause: "No anomaly detected. Mismatch stayed at honest-noise level in every bag at both verifiers.",
+    mitigation: ["None required"],
+  },
+  forgery: {
+    key: "forgery",
+    cause:
+      "The signature was not produced from Alice's private quantum states. Its claims disagree with the qubits both verifiers hold in about half of all slots, which is what blind guessing produces.",
+    mitigation: [
+      "Reject the message and log the event",
+      "Trace where the signature packet originated",
+      "No key exposure to revoke: quantum material is one-time and destroyed after every run",
+    ],
+  },
+  impersonation: {
+    key: "impersonation",
+    cause:
+      "The requester could not demonstrate shared entanglement at session admission. Fidelity stayed at or below 0.5, the ceiling for any resource that is not genuinely entangled.",
+    mitigation: [
+      "Refuse the session; no keys are generated",
+      "Verify the requester through an independent channel",
+      "Inspect the quantum link and source hardware if failures are unexpected",
+    ],
+  },
+  "replay-used": {
+    key: "replay-used",
+    cause:
+      "A previously verified session key was resubmitted. Session keys are single-use and this one is already marked USED.",
+    mitigation: [
+      "Keep session keys strictly single-use (atomic ACTIVE to USED)",
+      "Alert on repeated submissions of USED sessions",
+      "Investigate how the old transaction was captured",
+    ],
+  },
+  "replay-unknown": {
+    key: "replay-unknown",
+    cause:
+      "The presented session key was never issued by this system, so no quantum material exists that could match it.",
+    mitigation: [
+      "Reject and log the source",
+      "Rate-limit repeated unknown-key submissions",
+      "Review how the identifier was obtained or guessed",
+    ],
+  },
+  "tampering-fixed-basis": {
+    key: "tampering-fixed-basis",
+    cause:
+      "An interceptor on the quantum link measures every qubit in one fixed basis and resends it. That basis survives; the other two are disturbed to about one half. The clean basis shows which one Eve fixed.",
+    mitigation: [
+      "Inspect the affected physical link for taps",
+      "Route around the affected link until it is cleared",
+      "Use fresh quantum material for the next session (automatic: keys are one-time)",
+    ],
+  },
+  "tampering-random-basis": {
+    key: "tampering-random-basis",
+    cause:
+      "An interceptor on the quantum link guesses a measurement basis for each qubit and resends it. Every basis ends up disturbed by about one third.",
+    mitigation: [
+      "Treat the quantum channel as untrusted",
+      "Investigate physical access to the fibre or free-space path",
+      "Use fresh quantum material and a different link for the next session",
+    ],
+  },
+  "tampering-partial": {
+    key: "tampering-partial",
+    cause:
+      "Intermittent interception on a share of slots dilutes the random-basis signature so that individual bags sit close to the pass line. Requiring all 63 bags to pass still makes detection likely, but not certain for weak attacks.",
+    mitigation: [
+      "Increase monitoring on the affected link",
+      "Review repeated near-miss sessions on the same link",
+      "Inspect the link for intermittent taps",
+    ],
+  },
+  "tampering-message-substitution": {
+    key: "tampering-message-substitution",
+    cause:
+      "The message was altered after signing. The signature belongs to a different message, so bags fail exactly at the positions where the two encoded messages differ; the failed positions point to the originally signed message.",
+    mitigation: [
+      "Reject the message",
+      "Verify message integrity along the delivery path",
+      "Compare the failed positions with the encoded original to recover what was really signed",
+    ],
+  },
+  "tampering-correction-bit": {
+    key: "tampering-correction-bit",
+    cause:
+      "The two teleportation correction bits were inverted on the classical link, which applies an extra Y error to every state received. Two bases fail almost completely and one stays clean.",
+    mitigation: [
+      "Investigate the classical link between Alice and the affected verifier",
+      "Authenticate the classical communication layer (future scope)",
+      "Re-run with fresh quantum material",
+    ],
+  },
+};
 
 const { bags: BAGS, slotsPerBag: SLOTS, passLine: PASS_LINE, honestErrorRate: HONEST } =
   SYSTEM_PARAMS;
@@ -574,7 +693,7 @@ function buildLifecycle(ctx: BuildCtx): { events: RunEvent[]; logs: LogRow[] } {
   analysis("Mismatch counts → error rates per basis");
   log("verify", "system", "CLASSIFIED", "check", `Classification: ${scenario.classification}.`);
   analysis("Fingerprint → classification");
-  log("verify", "system", "ROOT_CAUSE_SET", "check", `Root cause: ${DIAGNOSIS[diagnosisKey(config.attack, config.subtype)].cause}.`);
+  log("verify", "system", "ROOT_CAUSE_SET", "check", `Root cause: ${(MOCK_DIAGNOSIS[diagnosisKey(config.attack, config.subtype)] ?? MOCK_DIAGNOSIS["no-attack"]).cause}.`);
   analysis("Classification → root cause");
   log("verify", "system", "SEVERITY_COMPUTED", "check", "Severity computed from confidence, deviation and category.");
   analysis("Root cause → severity");
@@ -599,7 +718,7 @@ function nearestPattern(rates: { Z: number; X: number; Y: number }): {
   library: { id: string; label: string; distance: number; profile: number[] }[];
 } {
   const observed = [rates.Z, rates.X, rates.Y].sort((a, b) => b - a);
-  const scored = FINGERPRINT_LIBRARY.map((p) => {
+  const scored = MOCK_FINGERPRINT_LIBRARY.map((p) => {
     const profile = [...p.profile].sort((a, b) => b - a);
     return {
       id: p.id,
@@ -871,6 +990,9 @@ function buildResult(ctx: ResultCtx): ResultResponse {
           : null,
       detectionCurve,
       bagDistribution,
+      diagnosis:
+        MOCK_DIAGNOSIS[diagnosisKey(config.attack, config.subtype)] ??
+        MOCK_DIAGNOSIS["no-attack"],
     },
     attackPath: { injected: scenario.injectedBetween, caught: scenario.caughtBy },
     story: STORY_LOOKUP[storyKeyOf(config)] ?? "",
@@ -1064,6 +1186,19 @@ export const mockApi: QdsApi = {
         detected: v.detected,
         meanSeverity: v.runs ? v.severity / v.runs : 0,
       })),
+    };
+  },
+
+  async getSystem(): Promise<SystemResponse> {
+    await sleep(60);
+    return {
+      params: { ...SYSTEM_PARAMS, verifierNames: [...SYSTEM_PARAMS.verifierNames] },
+      fingerprintLibrary: MOCK_FINGERPRINT_LIBRARY.map((f) => ({
+        ...f,
+        profile: [...f.profile],
+      })),
+      engineVersion: "mock",
+      catalogVersion: 1,
     };
   },
 };

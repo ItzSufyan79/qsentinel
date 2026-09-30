@@ -15,6 +15,7 @@ import { STAGE_CONFIG } from "../lib/phases";
 import { STAGE_COPY } from "../lib/copy";
 import { getRun } from "../lib/runStore";
 import { useRunId } from "../lib/useRunId";
+import { useSystem } from "../lib/useSystem";
 import {
   StageStepper,
   Icon,
@@ -440,6 +441,7 @@ function LiveStagePanel({
   attack: AttackTypeId;
   subtype: TamperingSubtype | null;
 }) {
+  const { params } = useSystem(); // before any conditional return — valid hook order
   if (stage === null || cur === undefined) {
     return (
       <div className="card-muted p-5">
@@ -476,10 +478,10 @@ function LiveStagePanel({
         <div className="card-muted p-5">
           <p className="display text-[12px] tracking-[0.08em] text-n-500 uppercase">Private key generation</p>
           <p className="mt-3 text-[14px] text-n-600">
-            63 bit-pairs generated — one 0-bag and one 1-bag of{" "}
+            {params.bags} bit-pairs generated — one 0-bag and one 1-bag of{" "}
             <Term term="Slot">One quantum state inside a bag.</Term> per encoded position. Only Alice knows which
             state is in which slot. It's one-time and destroyed after this run.{" "}
-            <Term term="Bag">128 slots. Each encoded bit has a 0-bag and a 1-bag; signing opens one of them.</Term>
+            <Term term="Bag">{`${params.slotsPerBag} slots. Each encoded bit has a 0-bag and a 1-bag; signing opens one of them.`}</Term>
           </p>
         </div>
       );
@@ -547,7 +549,7 @@ function LiveStagePanel({
       return (
         <div className="card-muted p-5">
           <p className="display text-[12px] tracking-[0.08em] text-n-500 uppercase">
-            {cur.verifier.toUpperCase()} · bag {cur.bagIndex + 1} of 63
+            {cur.verifier.toUpperCase()} · bag {cur.bagIndex + 1} of {params.bags}
           </p>
           <p className="mt-3 text-[14px] text-n-600">
             <span className="num">{cur.wrong}</span> wrong of <span className="num">{cur.checked}</span> measured
@@ -564,7 +566,7 @@ function LiveStagePanel({
             {cur.verifier.toUpperCase()} · verification complete
           </p>
           <p className="mt-3 text-[14px] text-n-600">
-            {cur.passed} of 63 bags passed{" "}
+            {cur.passed} of {cur.passed + cur.failed} bags passed{" "}
             <Outcome ok={cur.verdict === "ACCEPTED"}>{cur.verdict === "ACCEPTED" ? "ACCEPTED" : "REJECTED"}</Outcome>
           </p>
           <p className="micro mt-2 text-n-500">Z {cur.rates.Z.toFixed(2)} · X {cur.rates.X.toFixed(2)} · Y {cur.rates.Y.toFixed(2)}</p>
@@ -573,7 +575,7 @@ function LiveStagePanel({
     case "inject":
       return (
         <Banner tone="fail" title={`Eve acts now: ${attackLabel(attack)}${subtype ? ` (${tamperingLabel(subtype)})` : ""}`}>
-          {injectLine(subtype, cur.slotsAttacked)} {cur.tamperedMessage && `Replaced with "${cur.tamperedMessage}".`}
+          {injectLine(subtype, cur.slotsAttacked, cur.slotsTotal)} {cur.tamperedMessage && `Replaced with "${cur.tamperedMessage}".`}
         </Banner>
       );
     case "analysis":
@@ -597,7 +599,7 @@ function LiveStagePanel({
   }
 }
 
-function injectLine(subtype: TamperingSubtype | null, slotsAttacked: number | null) {
+function injectLine(subtype: TamperingSubtype | null, slotsAttacked: number | null, slotsTotal: number | null) {
   switch (subtype) {
     case "fixed-basis":
       return "Eve measures every intercepted qubit with the one chosen basis and re-sends new qubits.";
@@ -605,7 +607,7 @@ function injectLine(subtype: TamperingSubtype | null, slotsAttacked: number | nu
       return "Eve guesses a basis for each qubit she intercepts; the basis letter flickers every slot.";
     case "partial":
       return slotsAttacked !== null
-        ? `${slotsAttacked} of 128 slots per bag are attacked (red); untouched slots stay in the clear.`
+        ? `${slotsAttacked} of ${slotsTotal ?? "the"} slots per bag are attacked (red); untouched slots stay in the clear.`
         : "Attacked slots are red on the strip.";
     case "message-substitution":
       return "Eve swapped the message after signing.";

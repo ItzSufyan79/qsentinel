@@ -472,6 +472,15 @@ export interface ResultEnvelope {
     falseRejection: number;
     falseAcceptance: number;
   } | null;
+  /** backend-owned diagnosis (report 7.9): what the evidence points to + remedy */
+  diagnosis: Diagnosis;
+}
+
+/** Root cause + mitigation for the DETECTED pattern, from the attack catalog. */
+export interface Diagnosis {
+  key: string;
+  cause: string;
+  mitigation: string[];
 }
 
 export interface ResultResponse {
@@ -489,6 +498,30 @@ export interface ResultResponse {
   story: string;
   stoppedAt: StageId | null;
   injectedAt: StageId | null;
+}
+
+/* ------------------------------------------------------------------ *
+ *  System — GET /api/system: fixed parameters + detection references,
+ *  owned by the backend (report 2.2, 7.2). The UI renders, never redefines.
+ * ------------------------------------------------------------------ */
+
+export interface SystemResponse {
+  params: {
+    slotsPerBag: number;
+    bags: number;
+    passLine: number;
+    fidelityGate: number;
+    verifierNames: string[];
+    honestErrorRate: number;
+  };
+  fingerprintLibrary: {
+    id: string;
+    label: string;
+    profile: number[];
+    meaning: string;
+  }[];
+  engineVersion: string;
+  catalogVersion: number;
 }
 
 /* ------------------------------------------------------------------ *

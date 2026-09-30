@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ATTACK_OPTIONS, TAMPER_OPTIONS } from "../api/types";
-import { SYSTEM_PARAMS } from "../api";
+import { useSystem } from "../lib/useSystem";
 import { STAGE_CONFIG } from "../lib/phases";
 import { STAGE_COPY } from "../lib/copy";
 import { GLOSSARY } from "../lib/glossary";
@@ -15,6 +15,7 @@ import { TopologyCanvas } from "../components/ui/TopologyCanvas";
 import type { IconName } from "../lib/iconNames";
 
 export function OverviewPage() {
+  const { params: sys } = useSystem();
   const [envStep, setEnvStep] = useState(0);
   const [limitsOpen, setLimitsOpen] = useState(false);
 
@@ -253,11 +254,11 @@ export function OverviewPage() {
         <SectionHead step="08" title="Key numbers" state="active" />
         <dl className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
           {[
-            { label: "Slots per bag", value: SYSTEM_PARAMS.slotsPerBag, def: "128 slots. Each encoded bit has a 0-bag and a 1-bag; signing opens one of them." },
-            { label: "Bags per signature", value: SYSTEM_PARAMS.bags, def: "One bag per encoded position of the 63-bit BCH code." },
-            { label: "Pass line", value: `< ${SYSTEM_PARAMS.passLine}`, def: "A bag passes if it has fewer than 12 wrong slots out of 128." },
-            { label: "Fidelity gate", value: `F > ${SYSTEM_PARAMS.fidelityGate}`, def: "Refuses the session if F ≤ 0.5." },
-            { label: "Independent verifiers", value: SYSTEM_PARAMS.verifierNames.length, def: "A party who checks the signature. There are exactly two: Bob and Charlie." },
+            { label: "Slots per bag", value: sys.slotsPerBag, def: `${sys.slotsPerBag} slots. Each encoded bit has a 0-bag and a 1-bag; signing opens one of them.` },
+            { label: "Bags per signature", value: sys.bags, def: `One bag per encoded position of the ${sys.bags}-bit BCH code.` },
+            { label: "Pass line", value: `< ${sys.passLine}`, def: `A bag passes if it has fewer than ${sys.passLine} wrong slots out of ${sys.slotsPerBag}.` },
+            { label: "Fidelity gate", value: `F > ${sys.fidelityGate}`, def: `Refuses the session if F ≤ ${sys.fidelityGate}.` },
+            { label: "Independent verifiers", value: sys.verifierNames.length, def: `A party who checks the signature. There are exactly ${sys.verifierNames.length}: ${sys.verifierNames.join(" and ")}.` },
             { label: "Severity", value: "0–10", def: "A 0–10 project-specific rating of an incident." },
           ].map((d) => (
             <div key={d.label} className="card-muted p-4">

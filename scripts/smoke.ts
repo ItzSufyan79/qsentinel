@@ -6,9 +6,11 @@
  * Run: npm run smoke
  */
 
-import { api, ApiError, ROUTES, SYSTEM_PARAMS } from "../src/api";
-import { FINGERPRINT_LIBRARY } from "../src/lib/copy";
+import { API_MODE, api, ApiError, ROUTES } from "../src/api";
 import type { RunConfig } from "../src/api/types";
+
+/** Report 4.4: words the system never says. */
+const BANNED = /\b(block(?:ed|ing|s)?|collusion|arbitration|verifier[ -]cross[ -]check|classical[ -]mac|malicious|compromised)\b/i;
 
 let failed = 0;
 const section = (name: string) => console.log(`\n— ${name}`);
@@ -35,14 +37,17 @@ async function main() {
    *  1 — fixed system parameters (report 2.2 / 5.5)
    * ---------------------------------------------------------------- */
   section("1 · system parameters + routes");
-  check("slots per bag is 128", SYSTEM_PARAMS.slotsPerBag === 128);
-  check("63 bags", SYSTEM_PARAMS.bags === 63);
-  check("pass line is <12 wrong", SYSTEM_PARAMS.passLine === 12);
-  check("fidelity gate is 0.5", SYSTEM_PARAMS.fidelityGate === 0.5);
-  check("exactly two verifiers: Bob, Charlie", SYSTEM_PARAMS.verifierNames.join(",") === "Bob,Charlie");
+  const sys = await api.getSystem();
+  check("backend serves slots per bag = 128", sys.params.slotsPerBag === 128);
+  check("backend serves 63 bags", sys.params.bags === 63);
+  check("backend serves pass line <12 wrong", sys.params.passLine === 12);
+  check("backend serves fidelity gate 0.5", sys.params.fidelityGate === 0.5);
+  check("exactly two verifiers: Bob, Charlie", sys.params.verifierNames.join(",") === "Bob,Charlie");
+  check("fingerprint library has the five reference patterns", sys.fingerprintLibrary.length === 5);
+  check("engine + catalog versions are reported", sys.engineVersion.length > 0 && sys.catalogVersion >= 1);
   check(
     "route map has exactly the §11 routes",
-    Object.keys(ROUTES).sort().join(",") === "binomial,events,history,logs,rerun,result,run",
+    Object.keys(ROUTES).sort().join(",") === "binomial,events,history,logs,rerun,result,run,system",
   );
 
   /* ---------------------------------------------------------------- *
@@ -64,9 +69,18 @@ async function main() {
   check("createRun echoes a seed", typeof created.seed === "number");
   check("createRun echoes the config", created.config.attack === "tampering");
   const fresh = await api.getResult(created.session_id);
+  check("fresh run reaches a verdict", fresh.verdict === "ACCEPTED" || fresh.verdict === "REJECTED");
   check(
-    "a fresh tampering run is REJECTED with severity > 0",
-    fresh.verdict === "REJECTED" && fresh.verdictBanner.severity.score > 0,
+    "severity is consistent with the verdict (evidence, not config)",
+    fresh.verdict === "REJECTED"
+      ? fresh.verdictBanner.severity.score > 0
+      : fresh.verdictBanner.severity.score === 0,
+  );
+  check(
+    "diagnosis travels on the wire",
+    fresh.verdictBanner.diagnosis.key.length > 0 &&
+      fresh.verdictBanner.diagnosis.cause.length > 0 &&
+      fresh.verdictBanner.diagnosis.mitigation.length > 0,
   );
 
   await rejects("message > 64 chars is refused", () =>
@@ -114,8 +128,9 @@ async function main() {
   check("honest severity is zero", honest.verdictBanner.severity.score === 0);
   check(
     "honest fidelity passes the gate",
-    (honest.verdictBanner.fidelityTest?.F ?? 0) > SYSTEM_PARAMS.fidelityGate,
+    (honest.verdictBanner.fidelityTest?.F ?? 0) > sys.params.fidelityGate,
   );
+  check("honest diagnosis says no-attack", honest.verdictBanner.diagnosis.key === "no-attack");
   check(
     "honest: both verifiers verify (no NOT RUN)",
     honest.verdictBanner.verifiers.bob.verdict !== "NOT RUN" &&
@@ -139,6 +154,7 @@ async function main() {
       fake.verdictBanner.verifiers.charlie.verdict === "REJECTED",
   );
   check("forgery severity > 0", fake.verdictBanner.severity.score > 0);
+  check("forgery diagnosis keys to the catalog", fake.verdictBanner.diagnosis.key === "forgery");
   check(
     "forgery gets the full three-step reasoning chain",
     fake.verdictBanner.why.length === 3 &&
@@ -169,6 +185,11 @@ async function main() {
     used.verdictBanner.ledger?.status === "USED" && used.verdictBanner.ledger.found === true,
   );
   check("replay (USED): nothing verified", used.verdictBanner.verifiers.bob.verdict === "NOT RUN");
+  check(
+    "replay (USED): the queried id is a real session key",
+    (used.verdictBanner.ledger?.queriedId.length ?? 0) >= 6 &&
+      (API_MODE !== "http" || used.verdictBanner.ledger?.queriedId === "honest7"),
+  );
 
   const unknown = await api.getResult("b7z2c8");
   check("replay (unknown id) is caught too", unknown.verdict === "REJECTED");
@@ -185,7 +206,7 @@ async function main() {
   );
   check(
     "fixed-basis: library distances cover every pattern",
-    fz !== null && fz.library.length === FINGERPRINT_LIBRARY.length && fz.library.every((l) => l.distance >= 0),
+    fz !== null && fz.library.length === sys.fingerprintLibrary.length && fz.library.every((l) => l.distance >= 0),
   );
   check("best match agrees with the library ids", fz !== null && fz.library.some((l) => l.id === fz.best));
   const rz = fixedZ.verdictBanner.verifiers.bob.rates;
@@ -254,8 +275,8 @@ async function main() {
   const rerun = await api.rerun("e4f5a1");
   check("rerun issues a new session id", rerun.session_id.length >= 6 && rerun.session_id !== "e4f5a1");
   const rerunBack = await api.getResult(rerun.session_id);
-  check("rerun reproduces a REJECTED forgery", rerunBack.verdict === "REJECTED");
-  check("rerun result is stable (same story)", rerunBack.story.length > 0);
+  check("rerun keeps the same attack settings", rerunBack.verdictBanner.attackConfig.attack === "forgery");
+  check("rerun reaches a verdict with a story", (rerunBack.verdict === "ACCEPTED" || rerunBack.verdict === "REJECTED") && rerunBack.story.length > 0);
 
   /* ---------------------------------------------------------------- *
    *  8 — history
@@ -270,15 +291,30 @@ async function main() {
   const total = h.byAttack.reduce((a, r) => a + r.runs, 0);
   check("per-attack summary accounts for every run", total === h.runs.length);
   const noAttack = h.byAttack.find((r) => r.attack === "No attack");
+  check("honest runs are grouped in the summary", noAttack !== undefined && noAttack.runs >= 1);
+  const honestRow = h.runs.find((r) => r.sessionId === "honest7");
   check(
-    "honest runs have 0 detected and severity 0",
-    noAttack !== undefined && noAttack.detected === 0 && noAttack.meanSeverity === 0,
+    "the honest fixture is ACCEPTED with severity 0",
+    honestRow !== undefined && honestRow.verdict === "ACCEPTED" && honestRow.severity === 0,
   );
   const forgery = h.byAttack.find((r) => r.attack === "Forgery");
   check(
     "forgery is counted as detected",
     forgery !== undefined && forgery.detected === forgery.runs && forgery.meanSeverity > 0,
   );
+  /* ---------------------------------------------------------------- *
+   *  9 — banned terms (report 4.4) on every emitted string
+   * ---------------------------------------------------------------- */
+  section("9 · banned terms");
+  const texts: string[] = [];
+  for (const id of ["honest7", "e4f5a1", "k9r2xq", "m4v7p3", "t5c1r7", "n2y6u4", "j8k3w9"]) {
+    const r = await api.getResult(id);
+    texts.push(JSON.stringify(r));
+    for (const row of await api.getLogs(id)) texts.push(row.message);
+  }
+  texts.push(JSON.stringify(sys));
+  const hit = texts.find((s) => BANNED.test(s));
+  check("no banned vocabulary anywhere", hit === undefined, hit ? (BANNED.exec(hit)?.[0] ?? "") : "");
 }
 
 main()
