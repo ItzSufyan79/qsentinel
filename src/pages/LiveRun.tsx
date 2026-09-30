@@ -9,7 +9,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
-import type { AttackTypeId, FidelityEvent, RunEvent, StageId, TamperingSubtype } from "../api/types";
+import type {
+  AttackTypeId,
+  FidelityEvent,
+  ReplayType,
+  RunEvent,
+  StageId,
+  TamperingSubtype,
+  TargetLink,
+} from "../api/types";
 import { ATTACK_OPTIONS, TAMPER_OPTIONS, STAGES, attackLabel, tamperingLabel } from "../api/types";
 import { STAGE_CONFIG } from "../lib/phases";
 import { STAGE_COPY } from "../lib/copy";
@@ -156,7 +164,42 @@ export function LiveRunPage() {
   const cur: RunEvent | undefined = index >= 0 ? events[index] : undefined;
   const stage: StageId | null = cur ? bucketOf(cur) : null;
 
-  const config = stored?.config;
+  // Attack config normally comes from localStorage (the run was created here).
+  // On a cold link / deep href there is no stored entry, so hydrate the diagram
+  // from server truth: the backend freezes the full RunRecord at creation, so
+  // GET /result exposes authoritative verdictBanner.attackConfig immediately.
+  const [serverConfig, setServerConfig] = useState<{
+    attack: AttackTypeId;
+    subtype: TamperingSubtype | null;
+    targetLink: TargetLink | null;
+    replayType: ReplayType | null;
+    intensityPct: number | null;
+  } | null>(null);
+  useEffect(() => {
+    if (stored?.config) return;
+    let cancelled = false;
+    api
+      .getResult(runId)
+      .then((res) => {
+        if (cancelled) return;
+        const a = res.verdictBanner.attackConfig;
+        setServerConfig({
+          attack: a.attack as AttackTypeId,
+          subtype: a.subtype as TamperingSubtype | null,
+          targetLink: a.targetLink,
+          replayType: a.replayType as ReplayType | null,
+          intensityPct: a.intensityPct,
+        });
+      })
+      .catch(() => {
+        /* keep ServerTruth unknown; diagram stays honest = no-attack */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [runId, stored]);
+
+  const config = stored?.config ?? serverConfig;
   const attack = config?.attack ?? "no-attack";
   const subtype = config?.subtype ?? null;
   const targetLink = config?.targetLink ?? "both";
